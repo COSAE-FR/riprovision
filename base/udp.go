@@ -95,18 +95,42 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 				}
 				var ip *layers.IPv4
 				if dhcpPacket.IP.SrcIP.Equal(net.IPv4zero) || dhcpPacket.IP.DstIP.Equal(net.IPv4bcast) {
-					ip = &layers.IPv4{
+					/*ip = &layers.IPv4{
 						SrcIP:    *device.DHCP.ServerIP,
 						DstIP:    net.IPv4bcast,
 						Protocol: layers.IPProtocolUDP,
+					}*/
+					ip = &layers.IPv4{
+						Version:    4,                    //uint8
+						IHL:        5,                    //uint8
+						TOS:        0,                    //uint8
+						Id:         0,                    //uint16
+						Flags:      0,                    //IPv4Flag
+						FragOffset: 0,                    //uint16
+						TTL:        255,                  //uint8
+						Protocol:   layers.IPProtocolUDP, //IPProtocol UDP(17)
+						SrcIP:      *device.DHCP.ServerIP,
+						DstIP:      net.IPv4bcast,
 					}
 				} else {
-					ip = &layers.IPv4{
+					/*ip = &layers.IPv4{
 						SrcIP:    *device.DHCP.ServerIP,
 						DstIP:    *device.DHCP.ClientIP,
 						Protocol: layers.IPProtocolUDP,
 						//Version:  4,
 						TTL:      64,
+					}*/
+					ip = &layers.IPv4{
+						Version:    4,                    //uint8
+						IHL:        5,                    //uint8
+						TOS:        0,                    //uint8
+						Id:         0,                    //uint16
+						Flags:      0,                    //IPv4Flag
+						FragOffset: 0,                    //uint16
+						TTL:        255,                  //uint8
+						Protocol:   layers.IPProtocolUDP, //IPProtocol UDP(17)
+						SrcIP:      *device.DHCP.ServerIP,
+						DstIP:      *device.DHCP.ClientIP,
 					}
 				}
 				udp := &layers.UDP{
