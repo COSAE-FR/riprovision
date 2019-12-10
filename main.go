@@ -38,7 +38,7 @@ func New(cfg Config) (*base.Server, error) {
 		return configuration, fmt.Errorf("cannot bind to interface %s", configuration.Interface)
 	}
 	log.Printf("Capturing server started")
-	if configuration.DHCP.Enable {
+	/*if configuration.DHCP.Enable {
 		log.Printf("Setting capturing filter: %s", GlobalFilter)
 		err = configuration.Handler.SetFilter(GlobalFilter)
 	} else {
@@ -47,7 +47,7 @@ func New(cfg Config) (*base.Server, error) {
 	}
 	if err != nil {
 		log.Printf("cannot set capturing server filter: %v", err)
-	}
+	}*/
 
 	// Create IP setter
 	if configuration.DHCP.Enable {
