@@ -80,6 +80,9 @@ func (server *Server) Start() error {
 	server.StopListen = make(chan int)
 	server.StopWrite = make(chan int)
 	server.WriteNet = make(chan []byte, 100)
+	if server.DHCP.Enable {
+		go Serve(server.Handler.DHCP, server.WriteNet, server)
+	}
 	go server.Handler.Listen(server.StopListen)
 	go WritePacket(server.WriteNet, server.StopWrite, server.Handler)
 	return nil

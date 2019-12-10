@@ -28,7 +28,7 @@ func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
 	return pckt, nil
 }
 
-func Serve(in chan gopacket.Packet, out chan gopacket.Packet, handler dhcp4.Handler) error {
+func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) error {
 
 	for {
 		packet := <-in
