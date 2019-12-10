@@ -1,0 +1,6 @@
+interface: eth0
+provision:
+  provision_interfaces:
+    - eth1.12
+dhcp:
+  enable: yes
