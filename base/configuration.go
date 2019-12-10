@@ -105,7 +105,10 @@ func (server *Server) AddDevice(device Device) bool {
 
 func (server *Server) GetDevice(mac string) (Device, bool) {
 	device, ok := server.cache.Get(mac)
-	return device.(Device), ok
+	if ok {
+		return device.(Device), ok
+	}
+	return Device{}, ok
 }
 
 func (server *Server) HasDevice(mac string) bool {
