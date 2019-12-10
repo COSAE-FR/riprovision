@@ -1,8 +1,8 @@
 package base
 
 import (
-	"github.com/apparentlymart/go-cidr/cidr"
-"github.com/gcrahay/riprovision/arp"
+	"github.com/gcrahay/riprovision/arp"
+	"github.com/gcrahay/riprovision/network"
 	"github.com/krolaw/dhcp4"
 	log "github.com/sirupsen/logrus"
 	"net"
@@ -37,16 +37,13 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		}
 		log.Printf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
 		h.AddNet <- *freeNetwork
-		serverIP, err := cidr.Host(freeNetwork, 1)
+		_, targetNetwork, err := net.ParseCIDR(freeNetwork.Network())
 		if err != nil {
-			log.Printf("Cannot compute DHCP server IP")
+			log.Printf("Cannot get server IP: %v", err)
 			return
 		}
-		clientIP, err := cidr.Host(freeNetwork, 2)
-		if err != nil {
-			log.Printf("Cannot compute DHCP client IP")
-			return
-		}
+		serverIP := network.NextIP(targetNetwork.IP, 1)
+		clientIP := network.NextIP(targetNetwork.IP, 2)
 		device.DHCP = &DHCPDevice{
 			ServerIP:    &serverIP,
 			NetworkMask: &freeNetwork.Mask,

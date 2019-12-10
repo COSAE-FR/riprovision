@@ -2,7 +2,6 @@ package base
 
 import (
 	"fmt"
-	"github.com/apparentlymart/go-cidr/cidr"
 	"github.com/gcrahay/riprovision/network"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -75,12 +74,13 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 			return
 		case ipNetwork := <-add:
 			log.Printf("New address to add: %s", ipNetwork.String())
-			serverIP, err := cidr.Host(&ipNetwork, 1)
-			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
+			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network())
+			serverIP := network.NextIP(targetNetwork.IP, 1)
 			if err != nil {
 				log.Printf("Cannot get server IP: %v", err)
 				continue
 			}
+			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
 			err = AddInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
 				log.Printf("Cannot add server IP: %v", err)
@@ -89,11 +89,13 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 			continue
 		case ipNetwork := <-remove:
 			log.Printf("New address to remove: %s", ipNetwork.String())
-			serverIP, err := cidr.Host(&ipNetwork, 1)
+			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network())
+			serverIP := network.NextIP(targetNetwork.IP, 1)
 			if err != nil {
 				log.Printf("Cannot get server IP: %v", err)
 				continue
 			}
+			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
 			err = RemoveInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
 				log.Printf("Cannot remove server IP: %v", err)
