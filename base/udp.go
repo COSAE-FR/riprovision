@@ -140,6 +140,9 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					gopacket.Default,
 				)
 				log.Printf("Packet %+v", pk.LinkLayer())
+				log.Printf("Packet Net %+v", pk.NetworkLayer())
+				log.Printf("Packet Transport %+v", pk.TransportLayer())
+				log.Printf("Packet Application %+v", pk.ApplicationLayer())
 				out <- NewOutPacket(content)
 			} else {
 				log.Printf("DHCP response is empty or nil")
