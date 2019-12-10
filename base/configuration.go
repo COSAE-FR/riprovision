@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
+	"log"
 	"net"
 )
 
@@ -63,11 +64,13 @@ type Server struct {
 }
 
 func WritePacket(out chan []byte, exit chan int, handler *PacketHandler) {
+	log.Printf("Write goroutine started")
 	for {
 		select {
 		case <-exit:
 			return
 		case pckt := <-out:
+			log.Printf("New packet to write in write goroutine %d", len(pckt))
 			handler.Write(pckt)
 			continue
 

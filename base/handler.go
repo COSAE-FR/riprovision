@@ -91,5 +91,6 @@ func (handler *PacketHandler) Listen(stop chan int) {
 }
 
 func (handler *PacketHandler) Write(packet []byte) error {
+	log.Printf("Sending packet on wire, len %d", len(packet))
 	return handler.handle.WritePacketData(packet)
 }
