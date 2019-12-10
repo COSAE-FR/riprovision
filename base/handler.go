@@ -48,16 +48,20 @@ func (handler *PacketHandler) Close() {
 }
 
 func (handler *PacketHandler) Listen(stop chan int) {
+	log.Printf("Listening on interface %s", handler.iface.Name)
 	src := gopacket.NewPacketSource(handler.handle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
 		var packet gopacket.Packet
 		select {
 		case <-stop:
+			log.Print("Received a listener kill switch")
 			return
 		case packet = <-in:
+			log.Print("Received a new packet")
 			arpLayer := packet.Layer(layers.LayerTypeARP)
 			if arpLayer != nil {
+				log.Print("New packet is ARP")
 				arp := arpLayer.(*layers.ARP)
 				if !bytes.Equal([]byte(handler.iface.HardwareAddr), arp.SourceHwAddress) {
 					handler.ARP <- packet
@@ -66,8 +70,11 @@ func (handler *PacketHandler) Listen(stop chan int) {
 			}
 			udpLayer := packet.Layer(layers.LayerTypeUDP)
 			if udpLayer != nil {
+				log.Print("New packet is UDP")
+
 				udp := udpLayer.(*layers.UDP)
 				if udp.DstPort == InformPort {
+					log.Print("New packet is Inform")
 					ipLayer := packet.Layer(layers.LayerTypeIPv4)
 					if ipLayer != nil {
 						if bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast) {
@@ -75,6 +82,7 @@ func (handler *PacketHandler) Listen(stop chan int) {
 						}
 					}
 				} else if udp.DstPort == DHCPPort {
+					log.Print("New packet is DHCP")
 					handler.DHCP <- packet
 				}
 			}
