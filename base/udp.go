@@ -72,6 +72,7 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 					continue
 				}
 			}
+			log.Print("DHCP: Sending packet to DHCP handler")
 			if res := handler.ServeDHCP(req, reqType, options); res != nil {
 				// If IP not available, broadcast
 				/*ipStr, portStr, err := net.SplitHostPort(addr.String())

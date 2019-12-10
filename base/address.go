@@ -81,11 +81,14 @@ func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
 }
 
 func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IPNet, exit chan int) {
+	log.Printf("interface IP address manager started")
 	for {
 		select {
 		case <-exit:
+			log.Printf("interface IP address manager exit requested")
 			return
 		case ipNetwork := <-add:
+			log.Printf("New address to add: %s", ipNetwork.String())
 			serverIP, err := cidr.Host(&ipNetwork, 1)
 			if err != nil {
 				log.Printf("Cannot get server IP: %v", err)
@@ -98,6 +101,7 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 			}
 			continue
 		case ipNetwork := <-remove:
+			log.Printf("New address to remove: %s", ipNetwork.String())
 			serverIP, err := cidr.Host(&ipNetwork, 1)
 			if err != nil {
 				log.Printf("Cannot get server IP: %v", err)
@@ -111,4 +115,5 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 			continue
 		}
 	}
+	log.Printf("interface IP address manager exited")
 }

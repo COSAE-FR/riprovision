@@ -51,6 +51,7 @@ func New(cfg Config) (*base.Server, error) {
 
 	// Create IP setter
 	if configuration.DHCP.Enable {
+		log.Printf("Creating the interface IP address handler")
 		configuration.AddNet = make(chan net.IPNet, 100)
 		configuration.RemoveNet = make(chan net.IPNet, 100)
 		configuration.StopNet = make(chan int)

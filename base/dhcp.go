@@ -11,7 +11,9 @@ import (
 )
 
 func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dhcp4.Options) (d dhcp4.Packet) {
+
 	mac := p.CHAddr().String()
+	log.Printf("DHCP handler: Got packer from %s", mac)
 	if !h.validMAC(mac) {
 		log.Printf("[Client %v] Unauthorized client", mac)
 		return nil
@@ -19,6 +21,7 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 
 	device, found := h.GetDevice(mac)
 	if !found {
+		log.Printf("DHCP handler: Device not found")
 		device = Device{
 			MacAddress: mac,
 			Unifi:      nil,
@@ -26,11 +29,13 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		}
 	}
 	if device.DHCP == nil || device.DHCP.ClientIP == nil {
+		log.Printf("DHCP handler: no DHCP informations")
 		freeNetwork, err := h.GetDHCPNetwork()
 		if err != nil {
 			log.Printf("No free network")
 			return
 		}
+		log.Printf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
 		h.AddNet <- *freeNetwork
 		serverIP, err := cidr.Host(freeNetwork, 1)
 		if err != nil {
