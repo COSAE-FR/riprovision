@@ -44,7 +44,7 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 	for {
 		select {
 		case packet := <-in:
-			log.Printf("Received a DHCP packet")
+			log.Printf("DHCP: Received a DHCP packet")
 			dhcpPacket, err := preparePacket(packet)
 			if err != nil {
 				log.Printf("DHCP: Cannot prepare packet: %v", err)
