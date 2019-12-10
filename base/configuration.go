@@ -87,7 +87,12 @@ func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
 				continue
 			}
 			log.Printf("New packet to write in write goroutine %d", pckt.len)
-			handler.Write(pckt.data)
+			err := handler.Write(pckt.data)
+			if err != nil {
+				log.Printf("Write packet: error while writing: %+v", err)
+			} else {
+				log.Print("Write Packet: successful write")
+			}
 			continue
 
 		}
