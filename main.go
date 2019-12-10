@@ -72,7 +72,7 @@ func main() {
 	log.Printf("Started with %#v", cfg)
 	service.Main(&service.Info{
 		Name: "riprovisioner",
-
+		AllowRoot:true,
 		NewFunc: func() (service.Runnable, error) {
 			return New(cfg)
 		},
