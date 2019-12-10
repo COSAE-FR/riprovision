@@ -60,7 +60,8 @@ func GetFreeNetwork(base *net.IPNet, prefixLen int) (*net.IPNet, error) {
 }
 
 func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*net.IPNet, error) {
-	for candidate, end := cidr.NextSubnet(base, prefixLen); end != true; {
+	candidate := &net.IPNet{IP:base.IP, Mask: net.CIDRMask(prefixLen, 32)}
+	for candidate, end := cidr.NextSubnet(candidate, prefixLen); end != true; {
 		if end {
 			log.Printf("No network available")
 			break
