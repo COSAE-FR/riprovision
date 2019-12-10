@@ -143,6 +143,12 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 				log.Printf("Packet Net %+v", pk.NetworkLayer())
 				log.Printf("Packet Transport %+v", pk.TransportLayer())
 				log.Printf("Packet Application %+v", pk.ApplicationLayer())
+				dh := pk.Layer(layers.LayerTypeDHCPv4)
+				if dh == nil {
+					log.Printf("Cannot decode DHCPv4 layer")
+				} else {
+					log.Printf("Packet Application %+v", dh.(*layers.DHCPv4))
+				}
 				out <- NewOutPacket(content)
 			} else {
 				log.Printf("DHCP response is empty or nil")

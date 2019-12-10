@@ -3,12 +3,35 @@ package base
 import (
 	"github.com/gcrahay/riprovision/arp"
 	"github.com/gcrahay/riprovision/network"
+	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 	"time"
 )
+
+func dhcpReplyPacket(device *Device, request *dhcp4.Packet) layers.DHCPv4 {
+	clientHw, _ := net.ParseMAC(device.MacAddress)
+	reply := layers.DHCPv4{
+		Operation:    layers.DHCPOpReply,
+		HardwareType: 0,
+		HardwareLen:  0,
+		HardwareOpts: 0,
+		Xid:          0,
+		Secs:         0,
+		Flags:        0,
+		ClientIP:     device.DHCP.ClientIP.To4(),
+		YourClientIP: nil,
+		NextServerIP: nil,
+		RelayAgentIP: nil,
+		ClientHWAddr: clientHw,
+		ServerName:   nil,
+		File:         nil,
+		Options:      nil,
+	}
+	return reply
+}
 
 func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dhcp4.Options) (d dhcp4.Packet) {
 
