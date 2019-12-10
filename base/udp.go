@@ -113,7 +113,7 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 					SrcPort: layers.UDPPort(67),
 					DstPort: layers.UDPPort(68),
 				}
-				udp.Payload = res
+				//udp.Payload = res
 				if err := udp.SetNetworkLayerForChecksum(ip); err != nil {
 					log.Printf("Cannot set network layer: %v", err)
 					continue
@@ -124,7 +124,7 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 					EthernetType: layers.EthernetTypeIPv4,
 				}
 				buffer := gopacket.NewSerializeBuffer()
-				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp); err != nil {
+				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, gopacket.Payload(res)); err != nil {
 					log.Printf("Cannot serialize response: %v", err)
 					continue
 				}
