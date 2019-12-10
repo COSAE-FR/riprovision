@@ -43,11 +43,13 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 	}
 	for {
 		packet := <-in
+		log.Printf("Received a DHCP packet")
 		dhcpPacket, err := preparePacket(packet)
 		if err != nil {
 			log.Printf("DHCP: Cannot prepare packet: %v", err)
 			continue
 		}
+		log.Printf("DHCP packet is from %+v", dhcpPacket.IP)
 		n := dhcpPacket.UDP.Length
 		if n < 240 { // Packet too small to be DHCP
 			log.Printf("DHCP: Packet too small: %d", n)
