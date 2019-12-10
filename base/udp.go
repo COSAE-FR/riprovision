@@ -129,9 +129,18 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					log.Printf("Cannot serialize response: %v", err)
 					continue
 				}
+				log.Printf("Sending DHCP response %+v", eth)
 				log.Printf("Sending DHCP response %+v", ip)
+				log.Printf("Sending DHCP response %+v", udp)
 				log.Printf("Packet layers: %+v", buffer.Layers())
-				out <- NewOutPacket(buffer.Bytes())
+				content := buffer.Bytes()
+				pk := gopacket.NewPacket(
+					content,
+					layers.LayerTypeEthernet,
+					gopacket.Default,
+				)
+				log.Printf("Packet %+v", pk.LinkLayer())
+				out <- NewOutPacket(content)
 			} else {
 				log.Printf("DHCP response is empty or nil")
 			}
