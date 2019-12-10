@@ -50,6 +50,7 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 			ClientIP:    &clientIP,
 			Expiry:      time.Now().Add(60 * time.Minute),
 		}
+		h.AddDevice(device)
 
 	}
 	serverOptions := dhcp4.Options{
