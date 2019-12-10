@@ -51,33 +51,19 @@ type DHCPContext struct {
 }
 
 func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
-	var networks []string
+	var networks []net.IPNet
 	for _, deviceMAC := range server.cache.Keys() {
 		device, found := server.GetDevice(deviceMAC.(string))
 		if found && device.DHCP.ServerIP != nil {
-			deviceNetwork := &net.IPNet{
+			deviceNetwork := net.IPNet{
 				IP:   device.DHCP.ServerIP.Mask(*device.DHCP.NetworkMask),
 				Mask: *device.DHCP.NetworkMask,
 			}
-			networks = append(networks, deviceNetwork.String())
+			networks = append(networks, deviceNetwork)
 		}
 	}
-	for available, err := network.GetFreeNetwork(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix); err != nil; {
-		if stringInSlice(available.String(), networks) {
-			continue
-		}
-
-	}
-	for {
-		available, err := network.GetFreeNetwork(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix)
-		if err != nil {
-			return nil, err
-		}
-		if stringInSlice(available.String(), networks) {
-			continue
-		}
-		return available, nil
-	}
+	log.Printf("Used networks computed (%d)", len(networks))
+	return network.GetFreeNetworkBlacklist(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix, networks)
 }
 
 func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IPNet, exit chan int) {

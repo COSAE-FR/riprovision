@@ -40,9 +40,28 @@ func NetworkOverlapsLocalNetwork(n *net.IPNet) bool {
 	return false
 }
 
+func NetworkOverlapsBlacklist(n *net.IPNet, bl[]net.IPNet) bool {
+	for _, blNet := range bl {
+		if NetworkOverlap(&blNet, n) {
+			return true
+		}
+	}
+	return false
+}
+
 func GetFreeNetwork(base *net.IPNet, prefixLen int) (*net.IPNet, error) {
 	for candidate, end := cidr.NextSubnet(base, prefixLen); end != true; {
 		if !NetworkOverlapsLocalNetwork(candidate) {
+			return candidate, nil
+		}
+	}
+	return &net.IPNet{}, errors.New("no available network")
+}
+
+func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*net.IPNet, error) {
+	for candidate, end := cidr.NextSubnet(base, prefixLen); end != true; {
+
+		if !NetworkOverlapsLocalNetwork(candidate) && !NetworkOverlapsBlacklist(candidate, bl) {
 			return candidate, nil
 		}
 	}
