@@ -147,7 +147,13 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 				if dh == nil {
 					log.Printf("Cannot decode DHCPv4 layer")
 				} else {
-					log.Printf("Packet Application %+v", dh.(*layers.DHCPv4))
+					dhcp := dh.(*layers.DHCPv4)
+					log.Printf("Packet Application %+v", dhcp)
+					if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcp); err == nil { //
+						log.Printf("Serialized in 2nd round")
+						out <- NewOutPacket(buffer.Bytes())
+						continue
+					}
 				}
 				out <- NewOutPacket(content)
 			} else {
