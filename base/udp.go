@@ -121,7 +121,7 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 				eth := &layers.Ethernet{
 					SrcMAC:       conf.Iface.HardwareAddr,
 					DstMAC:       dhcpPacket.Ethernet.SrcMAC,
-					EthernetType: layers.EthernetTypeIPv4,
+				//	EthernetType: layers.EthernetTypeIPv4,
 				}
 				buffer := gopacket.NewSerializeBuffer()
 				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, gopacket.Payload(res)); err != nil {
