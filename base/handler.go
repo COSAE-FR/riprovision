@@ -47,7 +47,7 @@ func (handler *PacketHandler) Close() {
 	handler.handle.Close()
 }
 
-func (handler *PacketHandler) Listen(stop chan struct{}) {
+func (handler *PacketHandler) Listen(stop chan int) {
 	src := gopacket.NewPacketSource(handler.handle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {

@@ -57,6 +57,8 @@ type Server struct {
 	WriteNet  chan []byte
 	StopWrite chan int
 
+	StopListen chan int
+
 	cache *lru.Cache
 }
 
@@ -75,14 +77,17 @@ func WritePacket(out chan []byte, exit chan int, handler *PacketHandler) {
 }
 
 func (server *Server) Start() error {
+	server.StopListen = make(chan int)
 	server.StopWrite = make(chan int)
 	server.WriteNet = make(chan []byte, 100)
+	go server.Handler.Listen(server.StopListen)
 	go WritePacket(server.WriteNet, server.StopWrite, server.Handler)
 	return nil
 }
 
 func (server *Server) Stop() error {
 	// Stop the service here
+	server.StopListen <- 1
 	if server.DHCP.Enable {
 		server.StopNet <- 1
 	}
