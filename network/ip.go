@@ -60,22 +60,20 @@ func GetFreeNetwork(base *net.IPNet, prefixLen int) (*net.IPNet, error) {
 }
 
 func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*net.IPNet, error) {
-	candidate := &net.IPNet{IP:base.IP, Mask: net.CIDRMask(prefixLen, 32)}
-	for  {
-		candidate, end := cidr.NextSubnet(candidate, prefixLen)
-		if end {
-			log.Printf("No network available")
-			break
-		}
+	mask := net.CIDRMask(prefixLen, 32)
+	candidate := &net.IPNet{IP: base.IP, Mask:mask}
+	for {
 		log.Printf("Testing network %s", candidate.String())
+		if !NetworkOverlap(base, candidate) {
+			log.Printf("No available network in range")
+			return nil, errors.New("no available network in range")
+		}
 		if !NetworkOverlapsLocalNetwork(candidate) && !NetworkOverlapsBlacklist(candidate, bl) {
 			log.Printf("Candidate %s found!", candidate.String())
 			return candidate, nil
 		}
-		log.Printf("Network %s is in use", candidate.String())
+		candidate = &net.IPNet{IP: NextIP(candidate.IP, cidr.AddressCount(candidate)+2), Mask:mask}
 	}
-	log.Printf("No network available, finally")
-	return &net.IPNet{}, errors.New("no available network")
 }
 
 func GetIPForInterface(interfaceName string) (ipAddress *net.IPNet, err error) {
@@ -97,9 +95,9 @@ func GetIPForInterface(interfaceName string) (ipAddress *net.IPNet, err error) {
 	return ipAddress, errors.New("no IP found")
 }
 
-func NextIP(ip net.IP, inc uint) net.IP {
+func NextIP(ip net.IP, inc uint64) net.IP {
 	i := ip.To4()
-	v := uint(i[0])<<24 + uint(i[1])<<16 + uint(i[2])<<8 + uint(i[3])
+	v := uint64(i[0])<<24 + uint64(i[1])<<16 + uint64(i[2])<<8 + uint64(i[3])
 	v += inc
 	v3 := byte(v & 0xFF)
 	v2 := byte((v >> 8) & 0xFF)
