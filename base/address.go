@@ -75,11 +75,11 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 		case ipNetwork := <-add:
 			log.Printf("New address to add: %s", ipNetwork.String())
 			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network())
-			serverIP := network.NextIP(targetNetwork.IP, 1)
 			if err != nil {
-				log.Printf("Cannot get server IP: %v", err)
+				log.Printf("Cannot get server IP: %+v", err)
 				continue
 			}
+			serverIP := network.NextIP(targetNetwork.IP, 1)
 			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
 			err = AddInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
