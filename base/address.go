@@ -76,6 +76,7 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 		case ipNetwork := <-add:
 			log.Printf("New address to add: %s", ipNetwork.String())
 			serverIP, err := cidr.Host(&ipNetwork, 1)
+			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
 			if err != nil {
 				log.Printf("Cannot get server IP: %v", err)
 				continue
