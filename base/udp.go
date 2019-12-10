@@ -121,7 +121,7 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 				eth := &layers.Ethernet{
 					SrcMAC:       conf.Iface.HardwareAddr,
 					DstMAC:       dhcpPacket.Ethernet.SrcMAC,
-				//	EthernetType: layers.EthernetTypeIPv4,
+					EthernetType: layers.EthernetTypeIPv4,
 
 				}
 				buffer := gopacket.NewSerializeBuffer()
