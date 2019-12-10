@@ -122,7 +122,9 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					SrcMAC:       conf.Iface.HardwareAddr,
 					DstMAC:       dhcpPacket.Ethernet.SrcMAC,
 				//	EthernetType: layers.EthernetTypeIPv4,
+
 				}
+				udp.Payload = res
 				buffer := gopacket.NewSerializeBuffer()
 				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp); err != nil { //  gopacket.Payload(res)
 					log.Printf("Cannot serialize response: %v", err)
