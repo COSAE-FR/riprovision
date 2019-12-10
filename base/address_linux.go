@@ -11,13 +11,13 @@ import (
 func AddInterfaceIP(ip net.IP, mask net.IPMask, iface string) error {
 	bits, _ := mask.Size()
 	address := fmt.Sprintf("%s/%d", ip.String(), bits)
-	cmd := exec.Command("ifconfig", "add", address, "dev", iface)
+	cmd := exec.Command("ip", "addr", "add", address, "dev", iface)
 	return cmd.Run()
 }
 
 func RemoveInterfaceIP(ip net.IP, mask net.IPMask, iface string) error {
 	bits, _ := mask.Size()
 	address := fmt.Sprintf("%s/%d", ip.String(), bits)
-	cmd := exec.Command("ifconfig", "del", address, "dev", iface)
+	cmd := exec.Command("ip", "addr", "del", address, "dev", iface)
 	return cmd.Run()
 }
