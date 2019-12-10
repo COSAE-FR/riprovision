@@ -3,6 +3,7 @@ package network
 import (
 	"errors"
 	"github.com/apparentlymart/go-cidr/cidr"
+	"log"
 	"net"
 )
 
@@ -60,11 +61,18 @@ func GetFreeNetwork(base *net.IPNet, prefixLen int) (*net.IPNet, error) {
 
 func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*net.IPNet, error) {
 	for candidate, end := cidr.NextSubnet(base, prefixLen); end != true; {
-
+		if end {
+			log.Printf("No network available")
+			break
+		}
+		log.Printf("Testing network %s", candidate.String())
 		if !NetworkOverlapsLocalNetwork(candidate) && !NetworkOverlapsBlacklist(candidate, bl) {
+			log.Printf("Candidate %s found!", candidate.String())
 			return candidate, nil
 		}
+		log.Printf("Network %s is in use", candidate.String())
 	}
+	log.Printf("No network available, finally")
 	return &net.IPNet{}, errors.New("no available network")
 }
 
