@@ -36,7 +36,7 @@ func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
 	return pckt, nil
 }
 
-func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) error {
+func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) error {
 	packetOptions := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
@@ -129,7 +129,7 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 					continue
 				}
 				log.Printf("Sending DHCP response %+v", ip)
-				out <- buffer.Bytes()
+				out <- NewOutPacket(buffer.Bytes())
 			} else {
 				log.Printf("DHCP response is empty or nil")
 			}

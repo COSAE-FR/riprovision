@@ -55,7 +55,7 @@ type Server struct {
 	RemoveNet chan net.IPNet
 	StopNet   chan int
 
-	WriteNet  chan []byte
+	WriteNet  chan OutPacket
 	StopWrite chan int
 
 	StopListen chan int
@@ -63,15 +63,31 @@ type Server struct {
 	cache *lru.Cache
 }
 
-func WritePacket(out chan []byte, exit chan int, handler *PacketHandler) {
+type OutPacket struct {
+	data []byte
+	len int
+}
+
+func NewOutPacket(data []byte) OutPacket {
+	return OutPacket{
+		data: data,
+		len:  len(data),
+	}
+}
+
+func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
 	log.Printf("Write goroutine started")
 	for {
 		select {
 		case <-exit:
 			return
 		case pckt := <-out:
-			log.Printf("New packet to write in write goroutine %d", len(pckt))
-			handler.Write(pckt)
+			if len(pckt.data) != pckt.len {
+				log.Printf("WritePacket: error lengths differ: announced %d vs computed %d", pckt.len, len(pckt.data))
+				continue
+			}
+			log.Printf("New packet to write in write goroutine %d", pckt.len)
+			handler.Write(pckt.data)
 			continue
 
 		}
@@ -82,7 +98,7 @@ func WritePacket(out chan []byte, exit chan int, handler *PacketHandler) {
 func (server *Server) Start() error {
 	server.StopListen = make(chan int)
 	server.StopWrite = make(chan int)
-	server.WriteNet = make(chan []byte, 100)
+	server.WriteNet = make(chan OutPacket, 100)
 	if server.DHCP.Enable {
 		go Serve(server.Handler.DHCP, server.WriteNet, server)
 	}
