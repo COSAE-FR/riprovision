@@ -105,7 +105,7 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 						SrcIP:    *device.DHCP.ServerIP,
 						DstIP:    *device.DHCP.ClientIP,
 						Protocol: layers.IPProtocolUDP,
-						Version:  4,
+						//Version:  4,
 						TTL:      64,
 					}
 				}
