@@ -37,7 +37,7 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		}
 		log.Printf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
 		h.AddNet <- *freeNetwork
-		_, targetNetwork, err := net.ParseCIDR(freeNetwork.Network())
+		_, targetNetwork, err := net.ParseCIDR(freeNetwork.String())
 		if err != nil {
 			log.Printf("Cannot get server IP: %v", err)
 			return
