@@ -129,6 +129,8 @@ func Serve(in chan gopacket.Packet, out chan []byte, handler dhcp4.Handler) erro
 				}
 				log.Printf("Sending DHCP response %+v", ip)
 				out <- buffer.Bytes()
+			} else {
+				log.Printf("DHCP response is empty or nil")
 			}
 		}
 	}
