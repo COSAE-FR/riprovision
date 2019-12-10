@@ -78,8 +78,10 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		return dhcp4.ReplyPacket(p, dhcp4.NAK, *device.DHCP.ServerIP, nil, 0, nil)
 
 	case dhcp4.Release, dhcp4.Decline:
+		log.Printf("DHCP request is %v", msgType)
 
 	}
+	log.Printf("Cannot handle this DHCP request")
 	return nil
 }
 
