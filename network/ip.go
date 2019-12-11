@@ -2,8 +2,9 @@ package network
 
 import (
 	"errors"
+	"fmt"
 	"github.com/apparentlymart/go-cidr/cidr"
-	"log"
+	log "github.com/sirupsen/logrus"
 	"net"
 )
 
@@ -104,4 +105,12 @@ func NextIP(ip net.IP, inc uint64) net.IP {
 	v1 := byte((v >> 16) & 0xFF)
 	v0 := byte((v >> 24) & 0xFF)
 	return net.IPv4(v0, v1, v2, v3)
+}
+
+func FormatMask(mask net.IPMask) string {
+	if len(mask) != 4 {
+		return mask.String()
+	}
+
+	return fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
 }

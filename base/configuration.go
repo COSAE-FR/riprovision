@@ -4,10 +4,10 @@ import (
 	"fmt"
 	pssh "github.com/gcrahay/riprovision/ssh"
 	lru "github.com/hashicorp/golang-lru"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
-	"log"
 	"net"
 )
 
@@ -60,7 +60,7 @@ type Server struct {
 
 	StopListen chan int
 
-	cache *lru.Cache
+	Cache *lru.Cache
 }
 
 type OutPacket struct {
@@ -108,14 +108,24 @@ func (server *Server) Start() error {
 		go Serve(server.Handler.DHCP, server.WriteNet, server)
 	}
 	go server.Handler.Listen(server.StopListen)
+	go server.HandleInform(server.Handler.Inform)
 	go WritePacket(server.WriteNet, server.StopWrite, server.Handler)
 	return nil
 }
 
 func (server *Server) Stop() error {
 	// Stop the service here
+	log.Printf("Stopping riprovision server")
 	server.StopListen <- 1
 	if server.DHCP.Enable {
+		for _, deviceKeyInt := range server.Cache.Keys() {
+			device, found := server.GetDevice(deviceKeyInt.(string))
+			if found {
+				if device.DHCP != nil && device.DHCP.ServerIP != nil {
+					server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask }
+				}
+			}
+		}
 		server.StopNet <- 1
 	}
 	server.StopWrite <- 1
@@ -123,12 +133,12 @@ func (server *Server) Stop() error {
 }
 
 func (server *Server) AddDevice(device Device) bool {
-	return server.cache.Add(device.MacAddress, device)
+	return server.Cache.Add(device.MacAddress, device)
 
 }
 
 func (server *Server) GetDevice(mac string) (Device, bool) {
-	device, ok := server.cache.Get(mac)
+	device, ok := server.Cache.Get(mac)
 	if ok {
 		return device.(Device), ok
 	}
@@ -136,7 +146,7 @@ func (server *Server) GetDevice(mac string) (Device, bool) {
 }
 
 func (server *Server) HasDevice(mac string) bool {
-	return server.cache.Contains(mac)
+	return server.Cache.Contains(mac)
 }
 
 // LoadConfig reads a YAML file and converts it to a Server object
@@ -212,12 +222,6 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 	_, c.DHCP.baseNetwork, err = net.ParseCIDR(c.DHCP.BaseNetwork)
 	if err != nil {
 		errs = append(errs, fmt.Errorf("cannot parse DHCP base network %s", c.DHCP.BaseNetwork))
-	}
-
-	c.cache, err = lru.New(c.MaxDevices)
-
-	if err != nil {
-		errs = append(errs, err)
 	}
 
 	return

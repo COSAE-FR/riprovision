@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gcrahay/riprovision/base"
+	lru "github.com/hashicorp/golang-lru"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/hlandau/easyconfig.v1"
 	"gopkg.in/hlandau/service.v2"
@@ -55,7 +56,25 @@ func New(cfg Config) (*base.Server, error) {
 		configuration.AddNet = make(chan net.IPNet, 100)
 		configuration.RemoveNet = make(chan net.IPNet, 100)
 		configuration.StopNet = make(chan int)
+		configuration.Cache, err = lru.NewWithEvict(configuration.MaxDevices, func(key interface{}, value interface{}){
+			if value != nil {
+				device := value.(base.Device)
+				if device.DHCP != nil && device.DHCP.ServerIP != nil {
+					configuration.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
+				}
+			}
+		})
+		if err != nil {
+			log.Printf("cannot create device cache: %v", err)
+			return configuration, errors.New("cannot create device cache")
+		}
 		go configuration.LocalAddressManager(configuration.AddNet, configuration.RemoveNet, configuration.StopNet)
+	} else {
+		configuration.Cache, err = lru.New(configuration.MaxDevices)
+		if err != nil {
+			log.Printf("cannot create device cache: %v", err)
+			return configuration, errors.New("cannot create device cache")
+		}
 	}
 
 	return configuration, nil
@@ -71,6 +90,7 @@ func main() {
 
 	easyconfig.ParseFatal(configurator, &cfg)
 	log.Printf("Started with %#v", cfg)
+	log.SetLevel(log.DebugLevel)
 	service.Main(&service.Info{
 		Name: "riprovisioner",
 		AllowRoot:true,

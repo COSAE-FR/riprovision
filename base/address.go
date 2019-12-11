@@ -51,7 +51,7 @@ type DHCPContext struct {
 
 func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
 	var networks []net.IPNet
-	for _, deviceMAC := range server.cache.Keys() {
+	for _, deviceMAC := range server.Cache.Keys() {
 		device, found := server.GetDevice(deviceMAC.(string))
 		if found && device.DHCP.ServerIP != nil {
 			deviceNetwork := net.IPNet{
@@ -80,7 +80,6 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 				continue
 			}
 			serverIP := network.NextIP(targetNetwork.IP, 1)
-			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
 			err = AddInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
 				log.Printf("Cannot add server IP: %v", err)
@@ -89,13 +88,12 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 			continue
 		case ipNetwork := <-remove:
 			log.Printf("New address to remove: %s", ipNetwork.String())
-			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network())
-			serverIP := network.NextIP(targetNetwork.IP, 1)
+			_, targetNetwork, err := net.ParseCIDR(ipNetwork.String())
 			if err != nil {
 				log.Printf("Cannot get server IP: %v", err)
 				continue
 			}
-			log.Printf("Server IP: %s %+v", serverIP.String(), serverIP.To4())
+			serverIP := network.NextIP(targetNetwork.IP, 1)
 			err = RemoveInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
 				log.Printf("Cannot remove server IP: %v", err)
@@ -104,5 +102,4 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 			continue
 		}
 	}
-	log.Printf("interface IP address manager exited")
 }

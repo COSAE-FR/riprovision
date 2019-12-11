@@ -3,35 +3,12 @@ package base
 import (
 	"github.com/gcrahay/riprovision/arp"
 	"github.com/gcrahay/riprovision/network"
-	"github.com/google/gopacket/layers"
 	"github.com/krolaw/dhcp4"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"
 	"time"
 )
-
-func dhcpReplyPacket(device *Device, request *dhcp4.Packet) layers.DHCPv4 {
-	clientHw, _ := net.ParseMAC(device.MacAddress)
-	reply := layers.DHCPv4{
-		Operation:    layers.DHCPOpReply,
-		HardwareType: 0,
-		HardwareLen:  0,
-		HardwareOpts: 0,
-		Xid:          0,
-		Secs:         0,
-		Flags:        0,
-		ClientIP:     device.DHCP.ClientIP.To4(),
-		YourClientIP: nil,
-		NextServerIP: nil,
-		RelayAgentIP: nil,
-		ClientHWAddr: clientHw,
-		ServerName:   nil,
-		File:         nil,
-		Options:      nil,
-	}
-	return reply
-}
 
 func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dhcp4.Options) (d dhcp4.Packet) {
 
@@ -45,24 +22,26 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 	device, found := h.GetDevice(mac)
 	if !found {
 		log.Printf("DHCP handler: Device not found")
+		deviceLogger := log.WithField("device", mac)
 		device = Device{
 			MacAddress: mac,
 			Unifi:      nil,
 			DHCP:       nil,
+			Log: deviceLogger,
 		}
 	}
 	if device.DHCP == nil || device.DHCP.ClientIP == nil {
-		log.Printf("DHCP handler: no DHCP informations")
+		device.Log.Printf("DHCP handler: no DHCP informations")
 		freeNetwork, err := h.GetDHCPNetwork()
 		if err != nil {
-			log.Printf("No free network")
+			device.Log.Printf("No free network")
 			return
 		}
-		log.Printf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
+		device.Log.Printf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
 		h.AddNet <- *freeNetwork
 		_, targetNetwork, err := net.ParseCIDR(freeNetwork.String())
 		if err != nil {
-			log.Printf("Cannot get server IP: %v", err)
+			device.Log.Printf("Cannot get server IP: %v", err)
 			return
 		}
 		serverIP := network.NextIP(targetNetwork.IP, 1)
@@ -104,10 +83,10 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		return dhcp4.ReplyPacket(p, dhcp4.NAK, *device.DHCP.ServerIP, nil, 0, nil)
 
 	case dhcp4.Release, dhcp4.Decline:
-		log.Printf("DHCP request is %v", msgType)
+		device.Log.Printf("DHCP request is %v", msgType)
 
 	}
-	log.Printf("Cannot handle this DHCP request")
+	device.Log.Printf("Cannot handle this DHCP request")
 	return nil
 }
 

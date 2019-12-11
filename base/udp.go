@@ -74,19 +74,6 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 			}
 			log.Print("DHCP: Sending packet to DHCP handler")
 			if res := handler.ServeDHCP(req, reqType, options); res != nil {
-				// If IP not available, broadcast
-				/*ipStr, portStr, err := net.SplitHostPort(addr.String())
-				if err != nil {
-					return err
-				}
-
-				if net.ParseIP(ipStr).Equal(net.IPv4zero) || req.Broadcast() {
-					//port, _ := strconv.Atoi(portStr)
-					//addr = &net.UDPAddr{IP: net.IPv4bcast, Port: port}
-				}
-				if _, e := conn.WriteTo(res, addr); e != nil {
-					return e
-				} */
 				conf := *handler.(*Server)
 				device, found := conf.GetDevice(dhcpPacket.Ethernet.SrcMAC.String())
 				if !found {
@@ -95,11 +82,6 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 				}
 				var ip *layers.IPv4
 				if dhcpPacket.IP.SrcIP.Equal(net.IPv4zero) || dhcpPacket.IP.DstIP.Equal(net.IPv4bcast) {
-					/*ip = &layers.IPv4{
-						SrcIP:    *device.DHCP.ServerIP,
-						DstIP:    net.IPv4bcast,
-						Protocol: layers.IPProtocolUDP,
-					}*/
 					ip = &layers.IPv4{
 						Version:    4,                    //uint8
 						IHL:        5,                    //uint8
@@ -113,13 +95,6 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 						DstIP:      net.IPv4bcast,
 					}
 				} else {
-					/*ip = &layers.IPv4{
-						SrcIP:    *device.DHCP.ServerIP,
-						DstIP:    *device.DHCP.ClientIP,
-						Protocol: layers.IPProtocolUDP,
-						//Version:  4,
-						TTL:      64,
-					}*/
 					ip = &layers.IPv4{
 						Version:    4,                    //uint8
 						IHL:        5,                    //uint8
@@ -148,11 +123,30 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					EthernetType: layers.EthernetTypeIPv4,
 
 				}
+				dhcp := gopacket.NewPacket(
+					res,
+					layers.LayerTypeDHCPv4,
+					gopacket.Default,
+					)
+				var dhcpFound bool
 				buffer := gopacket.NewSerializeBuffer()
-				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, gopacket.Payload(res)); err != nil { //
-					log.Printf("Cannot serialize response: %v", err)
-					continue
+				if dhcp != nil {
+					dhcpLayer := dhcp.Layer(layers.LayerTypeDHCPv4)
+					if dhcpLayer != nil {
+							if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcpLayer.(*layers.DHCPv4)); err != nil { //
+								log.Printf("Cannot serialize response: %v", err)
+								continue
+							}
+						dhcpFound = true
+					}
 				}
+				if !dhcpFound {
+					if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, gopacket.Payload(res)); err != nil { //
+						log.Printf("Cannot serialize response: %v", err)
+						continue
+					}
+				}
+
 				log.Printf("Sending DHCP response %+v", eth)
 				log.Printf("Sending DHCP response %+v", ip)
 				log.Printf("Sending DHCP response %+v", udp)

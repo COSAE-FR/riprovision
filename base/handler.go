@@ -77,10 +77,15 @@ func (handler *PacketHandler) Listen(stop chan int) {
 					log.Print("New packet is Inform")
 					ipLayer := packet.Layer(layers.LayerTypeIPv4)
 					if ipLayer != nil {
-						if bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast) {
+						if ipLayer.(*layers.IPv4).DstIP.String() == net.IPv4bcast.String() && udp.Length > 4 {
+							log.Print("Sending packet to Inform handler")
 							handler.Inform <- packet
+							continue
 						}
+						log.Printf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast),  net.IPv4bcast.String(),  udp.Length)
+						continue
 					}
+					log.Printf("Cannot extract IP layer")
 				} else if udp.DstPort == DHCPPort {
 					log.Print("New packet is DHCP")
 					handler.DHCP <- packet
