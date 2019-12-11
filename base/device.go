@@ -4,6 +4,8 @@ import (
 	"github.com/gcrahay/riprovision/network"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"strconv"
+	"sync"
 	"time"
 )
 
@@ -13,6 +15,7 @@ type UnifiProvision struct {
 	VLAN    int
 	Gateway string
 	Iface   string
+	Configuration *provisionConfiguration
 }
 
 type UnifiDevice struct {
@@ -23,6 +26,7 @@ type UnifiDevice struct {
 	Firmware     string
 	IPAddresses  map[string][]string
 	UpSince      time.Time
+	RebootedAt	 time.Time
 	Essid        string
 	WirelessMode string
 	Provision    *UnifiProvision
@@ -40,7 +44,11 @@ type Device struct {
 	Unifi      *UnifiDevice
 	DHCP       *DHCPDevice
 	Log *log.Entry
+	busy    bool
+	busyMsg string
+	busyMtx sync.RWMutex
 }
+
 
 func (d *Device) String() string {
 	now := time.Now()
@@ -48,9 +56,9 @@ func (d *Device) String() string {
 	buf += "\n  MAC:           " + d.MacAddress
 	if d.DHCP != nil {
 		buf += "\n\n# DHCP details\n"
-		buf += "\nServer:		" + d.DHCP.ServerIP.String()
-		buf += "\nClient:		" + d.DHCP.ClientIP.String()
-		buf += "\nMask:			" + network.FormatMask(*d.DHCP.NetworkMask)
+		buf += "\n  Server:		" + d.DHCP.ServerIP.String()
+		buf += "\n  Client:		" + d.DHCP.ClientIP.String()
+		buf += "\n  Mask:		" + network.FormatMask(*d.DHCP.NetworkMask)
 	}
 	if d.Unifi != nil {
 		buf += "\n\n# Unifi details\n"
@@ -82,6 +90,7 @@ func (d *Device) String() string {
 			buf += "\n  Mask:       " + network.FormatMask(*d.Unifi.Provision.Mask)
 			buf += "\n  Gateway:    " + d.Unifi.Provision.Gateway
 			buf += "\n  Interface:  " + d.Unifi.Provision.Iface
+			buf += "\n  Ready:      " + strconv.FormatBool(d.IsReady())
 		}
 	}
 	return buf

@@ -31,12 +31,14 @@ type SSHConfiguration struct {
 }
 
 type configurationTemplates map[string]string
+type configurationModels map[string]string
 
 type provisionConfiguration struct {
 	InterfaceNames []string               `yaml:"provision_interfaces"`
 	SyslogPort     int                    `yaml:"syslog_port"`
 	SSH            SSHConfiguration       `yaml:"ssh"`
-	Templates      configurationTemplates `yaml:"config_templates"`
+	Models 			configurationModels		`yaml:"models"`
+	Templates      configurationTemplates `yaml:"templates"`
 }
 
 type Server struct {
@@ -133,6 +135,9 @@ func (server *Server) Stop() error {
 }
 
 func (server *Server) AddDevice(device Device) bool {
+	if device.Unifi != nil && device.Unifi.Provision != nil {
+		device.Unifi.Provision.Configuration = &server.Provision
+	}
 	return server.Cache.Add(device.MacAddress, device)
 
 }
@@ -140,7 +145,11 @@ func (server *Server) AddDevice(device Device) bool {
 func (server *Server) GetDevice(mac string) (Device, bool) {
 	device, ok := server.Cache.Get(mac)
 	if ok {
-		return device.(Device), ok
+		deviceObject := device.(Device)
+		if deviceObject.Unifi != nil && deviceObject.Unifi.Provision != nil {
+			deviceObject.Unifi.Provision.Configuration = &server.Provision
+		}
+		return deviceObject, ok
 	}
 	return Device{}, ok
 }

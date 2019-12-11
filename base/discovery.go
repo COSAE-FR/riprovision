@@ -347,8 +347,13 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 				}
 				provision := server.NewProvisionDevice(&device)
 				device.Unifi.Provision = provision
-				log.Debugf("Adding Device: \n%s", device.String())
+				device.Log.Debugf("Adding Device: \n%s", device.String())
 				server.AddDevice(device)
+				device.Log.Info("Launching provision")
+				if err := device.Provision(); err != nil {
+					device.Log.Errorf("Error when provisioning device: %v", err)
+				}
+
 			} else {
 				log.Debug("Cannot parse UDP layer of Inform packet")
 			}
@@ -363,7 +368,9 @@ func (server *Server) NewProvisionDevice(dev *Device) *UnifiProvision {
 	if dev.Unifi != nil && dev.Unifi.Provision != nil {
 		newDevice = dev.Unifi.Provision
 	} else {
-		newDevice = &UnifiProvision{}
+		newDevice = &UnifiProvision{
+			Configuration: &server.Provision,
+		}
 	}
 
 	for _, addrs := range dev.Unifi.IPAddresses {
