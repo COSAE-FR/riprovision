@@ -64,13 +64,13 @@ func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*n
 	mask := net.CIDRMask(prefixLen, 32)
 	candidate := &net.IPNet{IP: base.IP, Mask:mask}
 	for {
-		log.Printf("Testing network %s", candidate.String())
+		log.Debugf("Testing network %s", candidate.String())
 		if !NetworkOverlap(base, candidate) {
-			log.Printf("No available network in range")
+			log.Debugf("No available network in range")
 			return nil, errors.New("no available network in range")
 		}
 		if !NetworkOverlapsLocalNetwork(candidate) && !NetworkOverlapsBlacklist(candidate, bl) {
-			log.Printf("Candidate %s found!", candidate.String())
+			log.Debugf("Candidate %s found!", candidate.String())
 			return candidate, nil
 		}
 		candidate = &net.IPNet{IP: NextIP(candidate.IP, cidr.AddressCount(candidate)+2), Mask:mask}

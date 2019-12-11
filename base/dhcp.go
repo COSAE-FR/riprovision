@@ -13,15 +13,16 @@ import (
 func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dhcp4.Options) (d dhcp4.Packet) {
 
 	mac := p.CHAddr().String()
-	log.Printf("DHCP handler: Got packer from %s", mac)
+	logger := log.WithField("device", mac)
+	logger.Debugf("DHCP handler: Got packer from %s", mac)
 	if !h.validMAC(mac) {
-		log.Printf("[Client %v] Unauthorized client", mac)
+		logger.Error("Unauthorized client")
 		return nil
 	}
 
 	device, found := h.GetDevice(mac)
 	if !found {
-		log.Printf("DHCP handler: Device not found")
+		logger.Debugf("DHCP handler: Device not found, creating")
 		deviceLogger := log.WithField("device", mac)
 		device = Device{
 			MacAddress: mac,
@@ -31,17 +32,17 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		}
 	}
 	if device.DHCP == nil || device.DHCP.ClientIP == nil {
-		device.Log.Printf("DHCP handler: no DHCP informations")
+		device.Log.Debug("DHCP handler: no DHCP informations")
 		freeNetwork, err := h.GetDHCPNetwork()
 		if err != nil {
 			device.Log.Printf("No free network")
 			return
 		}
-		device.Log.Printf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
+		device.Log.Debugf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
 		h.AddNet <- *freeNetwork
 		_, targetNetwork, err := net.ParseCIDR(freeNetwork.String())
 		if err != nil {
-			device.Log.Printf("Cannot get server IP: %v", err)
+			device.Log.Errorf("Cannot get server IP: %v", err)
 			return
 		}
 		serverIP := network.NextIP(targetNetwork.IP, 1)
@@ -83,10 +84,10 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		return dhcp4.ReplyPacket(p, dhcp4.NAK, *device.DHCP.ServerIP, nil, 0, nil)
 
 	case dhcp4.Release, dhcp4.Decline:
-		device.Log.Printf("DHCP request is %v", msgType)
+		device.Log.Debugf("DHCP request is %v", msgType)
 
 	}
-	device.Log.Printf("Cannot handle this DHCP request")
+	device.Log.Debugf("Cannot handle this DHCP request")
 	return nil
 }
 
@@ -105,16 +106,16 @@ func (h *Server) validPrefix(mac string) bool {
 func (h *Server) validMAC(mac string) bool {
 	mac = strings.ToLower(mac)
 	if !h.validPrefix(mac) {
-		log.Printf("[Client %s] Invalid prefix", mac)
+		log.Warnf("[Client %s] Invalid prefix", mac)
 	}
 	macEntries := arp.ReverseSearch(mac)
 	for _, macEntry := range macEntries {
 		if macEntry.Permanent != true {
-			log.Printf("[Client %s] Non permanent MAC entry, searching: %+v", mac, macEntry)
+			log.Warnf("[Client %s] Non permanent MAC entry, searching: %+v", mac, macEntry)
 			continue
 		}
 		if !stringInSlice(macEntry.Iface, h.Provision.InterfaceNames) {
-			log.Printf("[Client %s] Not a client interface, searching: %+v", mac, macEntry)
+			log.Warnf("[Client %s] Not a client interface, searching: %+v", mac, macEntry)
 			continue
 		}
 		netInterface, err := net.InterfaceByName(macEntry.Iface)
@@ -128,16 +129,16 @@ func (h *Server) validMAC(mac string) bool {
 							break
 						}
 					default:
-						log.Printf("[Client %s] Cannot guess interface address, searching: %+v", mac, macEntry)
+						log.Debugf("[Client %s] Cannot guess interface address, searching: %+v", mac, macEntry)
 						continue
 					}
 				}
 			} else {
-				log.Printf("[Client %s] Cannot find interface addresses, searching: %+v", mac, macEntry)
+				log.Debugf("[Client %s] Cannot find interface addresses, searching: %+v", mac, macEntry)
 				continue
 			}
 		} else {
-			log.Printf("[Client %s] Cannot find interface on server, searching: %+v", mac, macEntry)
+			log.Debugf("[Client %s] Cannot find interface on server, searching: %+v", mac, macEntry)
 			continue
 		}
 		return true

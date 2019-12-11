@@ -44,40 +44,40 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 	for {
 		select {
 		case packet := <-in:
-			log.Printf("DHCP: Received a DHCP packet")
+			log.Debug("DHCP: Received a DHCP packet")
 			dhcpPacket, err := preparePacket(packet)
 			if err != nil {
-				log.Printf("DHCP: Cannot prepare packet: %v", err)
+				log.Errorf("DHCP: Cannot prepare packet: %v", err)
 				continue
 			}
 			n := dhcpPacket.UDP.Length
 			if n < 240 { // Packet too small to be DHCP
-				log.Printf("DHCP: Packet too small: %d", n)
+				log.Errorf("DHCP: Packet too small: %d", n)
 				continue
 			}
 			req := dhcp4.Packet(dhcpPacket.UDP.Payload)
 			if req.HLen() > 16 { // Invalid size
-				log.Printf("DHCP: Payload too small: %d", req.HLen())
+				log.Errorf("DHCP: Payload too small: %d", req.HLen())
 				continue
 			}
 			options := req.ParseOptions()
 			var reqType dhcp4.MessageType
 			if t := options[dhcp4.OptionDHCPMessageType]; len(t) != 1 {
-				log.Printf("DHCP: No or too much DHCP message types %d", len(t))
+				log.Errorf("DHCP: No or too much DHCP message types %d", len(t))
 				continue
 			} else {
 				reqType = dhcp4.MessageType(t[0])
 				if reqType < dhcp4.Discover || reqType > dhcp4.Inform {
-					log.Printf("DHCP: Wrong message type: %+v", reqType)
+					log.Errorf("DHCP: Wrong message type: %+v", reqType)
 					continue
 				}
 			}
-			log.Print("DHCP: Sending packet to DHCP handler")
+			log.Debug("DHCP: Sending packet to DHCP handler")
 			if res := handler.ServeDHCP(req, reqType, options); res != nil {
 				conf := *handler.(*Server)
 				device, found := conf.GetDevice(dhcpPacket.Ethernet.SrcMAC.String())
 				if !found {
-					log.Printf("Destination device not found: %s", dhcpPacket.Ethernet.SrcMAC.String())
+					log.Errorf("Destination device not found: %s", dhcpPacket.Ethernet.SrcMAC.String())
 					continue
 				}
 				var ip *layers.IPv4
@@ -114,7 +114,7 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 				}
 				//udp.Payload = res
 				if err := udp.SetNetworkLayerForChecksum(ip); err != nil {
-					log.Printf("Cannot set network layer: %v", err)
+					log.Errorf("Cannot set network layer: %v", err)
 					continue
 				}
 				eth := &layers.Ethernet{
@@ -147,35 +147,35 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					}
 				}
 
-				log.Printf("Sending DHCP response %+v", eth)
-				log.Printf("Sending DHCP response %+v", ip)
-				log.Printf("Sending DHCP response %+v", udp)
-				log.Printf("Packet layers: %+v", buffer.Layers())
+				log.Debugf("Sending DHCP response %+v", eth)
+				log.Debugf("Sending DHCP response %+v", ip)
+				log.Debugf("Sending DHCP response %+v", udp)
+				log.Debugf("Packet layers: %+v", buffer.Layers())
 				content := buffer.Bytes()
 				pk := gopacket.NewPacket(
 					content,
 					layers.LayerTypeEthernet,
 					gopacket.Default,
 				)
-				log.Printf("Packet %+v", pk.LinkLayer())
-				log.Printf("Packet Net %+v", pk.NetworkLayer())
-				log.Printf("Packet Transport %+v", pk.TransportLayer())
-				log.Printf("Packet Application %+v", pk.ApplicationLayer())
+				log.Debugf("Packet %+v", pk.LinkLayer())
+				log.Debugf("Packet Net %+v", pk.NetworkLayer())
+				log.Debugf("Packet Transport %+v", pk.TransportLayer())
+				log.Debugf("Packet Application %+v", pk.ApplicationLayer())
 				dh := pk.Layer(layers.LayerTypeDHCPv4)
 				if dh == nil {
-					log.Printf("Cannot decode DHCPv4 layer")
+					log.Debugf("Cannot decode DHCPv4 layer")
 				} else {
 					dhcp := dh.(*layers.DHCPv4)
-					log.Printf("Packet Application %+v", dhcp)
+					log.Debugf("Packet Application %+v", dhcp)
 					if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcp); err == nil { //
-						log.Printf("Serialized in 2nd round")
+						log.Warn("Serialized in 2nd round")
 						out <- NewOutPacket(buffer.Bytes())
 						continue
 					}
 				}
 				out <- NewOutPacket(content)
 			} else {
-				log.Printf("DHCP response is empty or nil")
+				log.Debug("DHCP response is empty or nil")
 			}
 		}
 	}

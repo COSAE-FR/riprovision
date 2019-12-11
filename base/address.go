@@ -61,42 +61,42 @@ func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
 			networks = append(networks, deviceNetwork)
 		}
 	}
-	log.Printf("Used networks computed (%d)", len(networks))
+	log.Debugf("Used networks computed (%d)", len(networks))
 	return network.GetFreeNetworkBlacklist(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix, networks)
 }
 
 func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IPNet, exit chan int) {
-	log.Printf("interface IP address manager started")
+	log.Debugf("interface IP address manager started")
 	for {
 		select {
 		case <-exit:
-			log.Printf("interface IP address manager exit requested")
+			log.Info("interface IP address manager exit requested")
 			return
 		case ipNetwork := <-add:
-			log.Printf("New address to add: %s", ipNetwork.String())
+			log.Debugf("New address to add: %s", ipNetwork.String())
 			_, targetNetwork, err := net.ParseCIDR(ipNetwork.String())
 			if err != nil {
-				log.Printf("Cannot get server IP: %+v", err)
+				log.Errorf("Cannot get server IP: %+v", err)
 				continue
 			}
 			serverIP := network.NextIP(targetNetwork.IP, 1)
 			err = AddInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
-				log.Printf("Cannot add server IP: %v", err)
+				log.Errorf("Cannot add server IP: %v", err)
 				continue
 			}
 			continue
 		case ipNetwork := <-remove:
-			log.Printf("New address to remove: %s", ipNetwork.String())
+			log.Debugf("New address to remove: %s", ipNetwork.String())
 			_, targetNetwork, err := net.ParseCIDR(ipNetwork.String())
 			if err != nil {
-				log.Printf("Cannot get server IP: %v", err)
+				log.Errorf("Cannot get server IP: %v", err)
 				continue
 			}
 			serverIP := network.NextIP(targetNetwork.IP, 1)
 			err = RemoveInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
 			if err != nil {
-				log.Printf("Cannot remove server IP: %v", err)
+				log.Errorf("Cannot remove server IP: %v", err)
 				continue
 			}
 			continue

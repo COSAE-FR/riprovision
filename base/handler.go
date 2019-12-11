@@ -28,7 +28,7 @@ func New(iface *net.Interface) (*PacketHandler, error) {
 	handler := &PacketHandler{iface: iface}
 	handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
 	if err != nil {
-		log.Printf("Unable to open packet capture on interface %s", iface.Name)
+		log.Errorf("Unable to open packet capture on interface %s", iface.Name)
 		return handler, err
 	}
 	handler.handle = handle
@@ -48,20 +48,20 @@ func (handler *PacketHandler) Close() {
 }
 
 func (handler *PacketHandler) Listen(stop chan int) {
-	log.Printf("Listening on interface %s", handler.iface.Name)
+	log.Debugf("Listening on interface %s", handler.iface.Name)
 	src := gopacket.NewPacketSource(handler.handle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
 		var packet gopacket.Packet
 		select {
 		case <-stop:
-			log.Print("Received a listener kill switch")
+			log.Info("Received a listener kill switch")
 			return
 		case packet = <-in:
-			log.Print("Received a new packet")
+			log.Debug("Received a new packet")
 			arpLayer := packet.Layer(layers.LayerTypeARP)
 			if arpLayer != nil {
-				log.Print("New packet is ARP")
+				log.Debug("New packet is ARP")
 				arp := arpLayer.(*layers.ARP)
 				if !bytes.Equal([]byte(handler.iface.HardwareAddr), arp.SourceHwAddress) {
 					handler.ARP <- packet
@@ -70,24 +70,24 @@ func (handler *PacketHandler) Listen(stop chan int) {
 			}
 			udpLayer := packet.Layer(layers.LayerTypeUDP)
 			if udpLayer != nil {
-				log.Print("New packet is UDP")
+				log.Debug("New packet is UDP")
 
 				udp := udpLayer.(*layers.UDP)
 				if udp.DstPort == InformPort {
-					log.Print("New packet is Inform")
+					log.Debug("New packet is Inform")
 					ipLayer := packet.Layer(layers.LayerTypeIPv4)
 					if ipLayer != nil {
 						if ipLayer.(*layers.IPv4).DstIP.String() == net.IPv4bcast.String() && udp.Length > 4 {
-							log.Print("Sending packet to Inform handler")
+							log.Debug("Sending packet to Inform handler")
 							handler.Inform <- packet
 							continue
 						}
-						log.Printf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast),  net.IPv4bcast.String(),  udp.Length)
+						log.Errorf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast),  net.IPv4bcast.String(),  udp.Length)
 						continue
 					}
-					log.Printf("Cannot extract IP layer")
+					log.Errorf("Cannot extract IP layer")
 				} else if udp.DstPort == DHCPPort {
-					log.Print("New packet is DHCP")
+					log.Debug("New packet is DHCP")
 					handler.DHCP <- packet
 				}
 			}
@@ -96,6 +96,6 @@ func (handler *PacketHandler) Listen(stop chan int) {
 }
 
 func (handler *PacketHandler) Write(packet []byte) error {
-	log.Printf("Sending packet on wire, len %d", len(packet))
+	log.Debugf("Sending packet on wire, len %d", len(packet))
 	return handler.handle.WritePacketData(packet)
 }

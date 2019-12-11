@@ -326,7 +326,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 					continue
 				}
 				unifiDevice := inform.Device()
-				if unifiDevice.DeclaredMacAddress != mac && false {
+				if unifiDevice.DeclaredMacAddress != mac {
 					logger.Errorf("Declared MAC differs from source MAC in packet: %s", unifiDevice.DeclaredMacAddress)
 					continue
 				}

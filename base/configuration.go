@@ -45,6 +45,8 @@ type Server struct {
 	Interface string `yaml:"interface"`
 	Iface     *net.Interface
 
+	LogLevel 	string `yaml:"log_level"`
+
 	MaxDevices int `yaml:"max_devices"`
 	MACPrefix  []string
 
@@ -78,22 +80,22 @@ func NewOutPacket(data []byte) OutPacket {
 }
 
 func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
-	log.Printf("Write goroutine started")
+	log.Debugf("Write goroutine started")
 	for {
 		select {
 		case <-exit:
 			return
 		case pckt := <-out:
 			if len(pckt.data) != pckt.len {
-				log.Printf("WritePacket: error lengths differ: announced %d vs computed %d", pckt.len, len(pckt.data))
+				log.Errorf("WritePacket: error lengths differ: announced %d vs computed %d", pckt.len, len(pckt.data))
 				continue
 			}
-			log.Printf("New packet to write in write goroutine %d", pckt.len)
+			log.Debugf("New packet to write in write goroutine %d", pckt.len)
 			err := handler.Write(pckt.data)
 			if err != nil {
-				log.Printf("Write packet: error while writing: %+v", err)
+				log.Errorf("Write packet: error while writing: %+v", err)
 			} else {
-				log.Print("Write Packet: successful write")
+				log.Debugf("Write Packet: successful write")
 			}
 			continue
 
@@ -117,7 +119,7 @@ func (server *Server) Start() error {
 
 func (server *Server) Stop() error {
 	// Stop the service here
-	log.Printf("Stopping riprovision server")
+	log.Info("Stopping riprovision server")
 	server.StopListen <- 1
 	if server.DHCP.Enable {
 		for _, deviceKeyInt := range server.Cache.Keys() {
@@ -176,6 +178,10 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 
 	if len(c.Interface) == 0 {
 		errs = append(errs, fmt.Errorf("missing option interfaces, at least one name (or '*') must be given"))
+	}
+
+	if len(c.LogLevel) == 0 {
+		c.LogLevel = "error"
 	}
 
 	c.Iface, err = net.InterfaceByName(c.Interface)

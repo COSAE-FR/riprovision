@@ -24,35 +24,40 @@ type Config struct {
 func New(cfg Config) (*base.Server, error) {
 	var err error
 	configuration, errs := base.LoadConfig(cfg.File)
+	logLevel, err := log.ParseLevel(configuration.LogLevel)
+	if err != nil {
+		logLevel = log.WarnLevel
+	}
+	log.SetLevel(logLevel)
 	if len(errs) > 0 {
-		log.Printf("Found %d error(s) loading the config file:", len(errs))
+		log.Errorf("Found %d error(s) loading the config file:", len(errs))
 		for i, e := range errs {
-			log.Printf("Error %d: %s", i, e.Error())
+			log.Debugf("Error %d: %s", i, e.Error())
 		}
 		return configuration, errors.New("errors when parsing config file")
 	}
 
 	// Create capturing server
-	log.Printf("Starting capturing server on interface %s", configuration.Interface)
+	log.Infof("Starting capturing server on interface %s", configuration.Interface)
 	configuration.Handler, err = base.New(configuration.Iface)
 	if err != nil {
 		return configuration, fmt.Errorf("cannot bind to interface %s", configuration.Interface)
 	}
-	log.Printf("Capturing server started")
+	log.Debugf("Capturing server started")
 	if configuration.DHCP.Enable {
-		log.Printf("Setting capturing filter: %s", GlobalFilter)
+		log.Debugf("Setting capturing filter: %s", GlobalFilter)
 		err = configuration.Handler.SetFilter(GlobalFilter)
 	} else {
-		log.Printf("Setting capturing filter: %s", NoDHCPFilter)
+		log.Debugf("Setting capturing filter: %s", NoDHCPFilter)
 		err = configuration.Handler.SetFilter(NoDHCPFilter)
 	}
 	if err != nil {
-		log.Printf("cannot set capturing server filter: %v", err)
+		log.Errorf("cannot set capturing server filter: %v", err)
 	}
 
 	// Create IP setter
 	if configuration.DHCP.Enable {
-		log.Printf("Creating the interface IP address handler")
+		log.Infof("Creating the interface IP address handler")
 		configuration.AddNet = make(chan net.IPNet, 100)
 		configuration.RemoveNet = make(chan net.IPNet, 100)
 		configuration.StopNet = make(chan int)
@@ -65,14 +70,14 @@ func New(cfg Config) (*base.Server, error) {
 			}
 		})
 		if err != nil {
-			log.Printf("cannot create device cache: %v", err)
+			log.Errorf("cannot create device cache: %v", err)
 			return configuration, errors.New("cannot create device cache")
 		}
 		go configuration.LocalAddressManager(configuration.AddNet, configuration.RemoveNet, configuration.StopNet)
 	} else {
 		configuration.Cache, err = lru.New(configuration.MaxDevices)
 		if err != nil {
-			log.Printf("cannot create device cache: %v", err)
+			log.Debugf("cannot create device cache: %v", err)
 			return configuration, errors.New("cannot create device cache")
 		}
 	}
@@ -89,8 +94,7 @@ func main() {
 	}
 
 	easyconfig.ParseFatal(configurator, &cfg)
-	log.Printf("Started with %#v", cfg)
-	log.SetLevel(log.DebugLevel)
+	log.Debugf("Started with %#v", cfg)
 	service.Main(&service.Info{
 		Name: "riprovisioner",
 		AllowRoot:true,
