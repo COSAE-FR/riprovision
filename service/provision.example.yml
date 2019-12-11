@@ -1,6 +1,76 @@
 interface: eth0
 provision:
+  models:
+    US8P60: UnifiAP
+  templates:
+    UnifiAP: |
+      # connectivity
+      connectivity.status=enabled
+      connectivity.uplink_eth=eth0{{if eq .Unifi.Provision.VLAN 1}}{{else}}.{{.Unifi.Provision.VLAN}}{{end}}
+      connectivity.uplink_bridge=br0
+      # bridge
+      bridge.status=enabled
+      bridge.1.devname=br0
+      bridge.1.fd=1
+      bridge.1.stp.status=disabled
+      bridge.1.port.1.devname=eth0.{{.Unifi.Provision.VLAN}}
+      bridge.1.port.2.devname=vwire1.{{.Unifi.Provision.VLAN}}
+      bridge.1.port.3.devname=vwire3.{{.Unifi.Provision.VLAN}}
+      # netconf
+      netconf.status=enabled
+      netconf.1.status=enabled
+      netconf.1.devname=br0
+      netconf.1.ip={{.Unifi.Provision.IP}}
+      netconf.1.autoip.status=disabled
+      netconf.1.netmask={{.Unifi.Provision.Mask}}
+      netconf.1.up=enabled
+      # mac acl
+      macacl.status=disabled
+      # dhcpc
+      dhcpc.status=enabled
+      # route
+      route.1.status=enabled
+      route.1.devname=br0
+      route.1.ip=0.0.0.0
+      route.1.gateway={{.Unifi.Provision.Gateway}}
+      route.status=enabled
+      # resolv
+      resolv.status=enabled
+      resolv.nameserver.1.ip={{.Unifi.Provision.Gateway}}
+      resolv.nameserver.2.status=disabled
+      resolv.search=reseau.rip
+      # ebtables
+      ebtables.status=enabled
+      ebtables.add_vlan.status=disabled
+      ebtables.1.cmd=-t broute -A BROUTING -i ath0 -p 802_1Q -j DROP
+      ebtables.2.cmd=-t broute -A BROUTING -i ath2 -p 802_1Q -j DROP
+      ebtables.3.cmd=-t broute -A BROUTING --vlan-id {{.Unifi.Provision.VLAN}} -p 802_1Q -j DROP
+      # syslog
+      syslog.status=enabled
+      syslog.level=7
+      syslog.remote.status=enabled
+      syslog.remote.ip={{.Unifi.Provision.Gateway}}
+      syslog.remote.port=5140
+      sshd.status=enabled
+      sshd.auth.passwd=enabled
+      sshd.1.status=enabled
+      sshd.1.ifname=br0
+      # ntpclient
+      ntpclient.status=enabled
+      ntpclient.1.status=enabled
+      ntpclient.1.server={{.Unifi.Provision.Gateway}}
+      ntpclient.2.status=disabled
+      ntpclient.2.server=1.ubnt.pool.ntp.org
+      ntpclient.3.status=disabled
+      ntpclient.3.server=2.ubnt.pool.ntp.org
+      ntpclient.4.status=disabled
+      ntpclient.4.server=3.ubnt.pool.ntp.org
+
   provision_interfaces:
-    - eth1.12
+    - eth1.156
+  ssh:
+    methods:
+      - type: password
+        password: ubnt
 dhcp:
   enable: yes

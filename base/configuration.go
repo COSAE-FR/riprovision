@@ -25,7 +25,7 @@ type sshAuthMethod struct {
 }
 
 type SSHConfiguration struct {
-	Usernames      []string
+	Usernames      []string `yaml:"users"`
 	SSHAuthMethods []sshAuthMethod `yaml:"methods"`
 	sshAuthMethods []ssh.AuthMethod
 }
