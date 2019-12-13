@@ -32,7 +32,7 @@ func New(cfg Config) (*base.Server, error) {
 	if len(errs) > 0 {
 		log.Errorf("Found %d error(s) loading the config file:", len(errs))
 		for i, e := range errs {
-			log.Debugf("Error %d: %s", i, e.Error())
+			log.Errorf("Error %d: %s", i, e.Error())
 		}
 		return configuration, errors.New("errors when parsing config file")
 	}
@@ -61,7 +61,7 @@ func New(cfg Config) (*base.Server, error) {
 		configuration.AddNet = make(chan net.IPNet, 100)
 		configuration.RemoveNet = make(chan net.IPNet, 100)
 		configuration.StopNet = make(chan int)
-		configuration.Cache, err = lru.NewWithEvict(configuration.MaxDevices, func(key interface{}, value interface{}){
+		configuration.Cache, err = lru.NewWithEvict(configuration.MaxDevices, func(key interface{}, value interface{}) {
 			if value != nil {
 				device := value.(base.Device)
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
@@ -86,6 +86,10 @@ func New(cfg Config) (*base.Server, error) {
 }
 
 func main() {
+	log.SetFormatter(&log.TextFormatter{
+		FullTimestamp:          true,
+		DisableLevelTruncation: true,
+	})
 	log.SetOutput(os.Stderr)
 	cfg := Config{}
 
@@ -96,8 +100,8 @@ func main() {
 	easyconfig.ParseFatal(configurator, &cfg)
 	log.Debugf("Started with %#v", cfg)
 	service.Main(&service.Info{
-		Name: "riprovisioner",
-		AllowRoot:true,
+		Name:      "riprovisioner",
+		AllowRoot: true,
 		NewFunc: func() (service.Runnable, error) {
 			return New(cfg)
 		},
