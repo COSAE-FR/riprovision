@@ -68,9 +68,10 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 			serverOptions.SelectOrderOrAll(options[dhcp4.OptionParameterRequestList]))
 
 	case dhcp4.Request:
-		if server, ok := options[dhcp4.OptionServerIdentifier]; ok && !net.IP(server).Equal(*device.DHCP.ServerIP) {
+		// DIsable : ubiquiti devices sends from 0.0.0.0 their requests server ID
+		/*if server, ok := options[dhcp4.OptionServerIdentifier]; ok && !net.IP(server).Equal(*device.DHCP.ServerIP) {
 			return nil // Message not for this dhcp server
-		}
+		} */
 		reqIP := net.IP(options[dhcp4.OptionRequestedIPAddress])
 		if reqIP == nil {
 			reqIP = net.IP(p.CIAddr())
@@ -85,6 +86,8 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 
 	case dhcp4.Release, dhcp4.Decline:
 		device.Log.Debugf("DHCP request is %v", msgType)
+	default:
+		device.Log.Debugf("DHCP request was %v. NOOP.", msgType)
 
 	}
 	device.Log.Debugf("Cannot handle this DHCP request")
