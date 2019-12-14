@@ -196,7 +196,6 @@ func parseIPInfo(data []byte) (interface{}, error) {
 	}, nil
 }
 
-
 type InformPacket struct {
 	Version   uint8
 	Tags      []*Tag
@@ -252,7 +251,7 @@ func (p *InformPacket) parse(cmd uint8, data []byte) error {
 
 func (p *InformPacket) Device() *UnifiDevice {
 	dev := &UnifiDevice{
-		IPAddresses:    make(map[string][]string),
+		IPAddresses: make(map[string][]string),
 	}
 
 	for _, t := range p.Tags {
@@ -303,7 +302,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 	log.Debug("Starting Inform packet handler")
 	for {
 		select {
-		case packet := <- in:
+		case packet := <-in:
 			log.Debugln("Received a new Inform packet")
 			ethLayer := packet.Layer(layers.LayerTypeEthernet)
 			if ethLayer == nil {
@@ -320,7 +319,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 			udpLayer := packet.Layer(layers.LayerTypeUDP)
 			if udpLayer != nil {
 				udp := udpLayer.(*layers.UDP)
-				inform, err :=ParseInformPacket(udp.Payload)
+				inform, err := ParseInformPacket(udp.Payload)
 				if err != nil {
 					logger.Error("Cannot parse packet payload")
 					continue
@@ -340,7 +339,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 						MacAddress: mac,
 						Unifi:      unifiDevice,
 						DHCP:       nil,
-						Log: logger,
+						Log:        logger,
 					}
 				} else {
 					device.Unifi = unifiDevice

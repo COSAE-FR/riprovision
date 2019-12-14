@@ -10,10 +10,10 @@ import (
 )
 
 type DHCPPacket struct {
-	Packet gopacket.Packet
+	Packet   gopacket.Packet
 	Ethernet *layers.Ethernet
-	IP     *layers.IPv4
-	UDP    *layers.UDP
+	IP       *layers.IPv4
+	UDP      *layers.UDP
 }
 
 func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
@@ -121,22 +121,21 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					SrcMAC:       conf.Iface.HardwareAddr,
 					DstMAC:       dhcpPacket.Ethernet.SrcMAC,
 					EthernetType: layers.EthernetTypeIPv4,
-
 				}
 				dhcp := gopacket.NewPacket(
 					res,
 					layers.LayerTypeDHCPv4,
 					gopacket.Default,
-					)
+				)
 				var dhcpFound bool
 				buffer := gopacket.NewSerializeBuffer()
 				if dhcp != nil {
 					dhcpLayer := dhcp.Layer(layers.LayerTypeDHCPv4)
 					if dhcpLayer != nil {
-							if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcpLayer.(*layers.DHCPv4)); err != nil { //
-								log.Printf("Cannot serialize response: %v", err)
-								continue
-							}
+						if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcpLayer.(*layers.DHCPv4)); err != nil { //
+							log.Printf("Cannot serialize response: %v", err)
+							continue
+						}
 						dhcpFound = true
 					}
 				}

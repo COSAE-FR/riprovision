@@ -82,7 +82,7 @@ func (handler *PacketHandler) Listen(stop chan int) {
 							handler.Inform <- packet
 							continue
 						}
-						log.Errorf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast),  net.IPv4bcast.String(),  udp.Length)
+						log.Errorf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast), net.IPv4bcast.String(), udp.Length)
 						continue
 					}
 					log.Errorf("Cannot extract IP layer")

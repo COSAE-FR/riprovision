@@ -42,7 +42,7 @@ func NetworkOverlapsLocalNetwork(n *net.IPNet) bool {
 	return false
 }
 
-func NetworkOverlapsBlacklist(n *net.IPNet, bl[]net.IPNet) bool {
+func NetworkOverlapsBlacklist(n *net.IPNet, bl []net.IPNet) bool {
 	for _, blNet := range bl {
 		if NetworkOverlap(&blNet, n) {
 			return true
@@ -62,7 +62,7 @@ func GetFreeNetwork(base *net.IPNet, prefixLen int) (*net.IPNet, error) {
 
 func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*net.IPNet, error) {
 	mask := net.CIDRMask(prefixLen, 32)
-	candidate := &net.IPNet{IP: base.IP, Mask:mask}
+	candidate := &net.IPNet{IP: base.IP, Mask: mask}
 	for {
 		log.Debugf("Testing network %s", candidate.String())
 		if !NetworkOverlap(base, candidate) {
@@ -73,7 +73,7 @@ func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*n
 			log.Debugf("Candidate %s found!", candidate.String())
 			return candidate, nil
 		}
-		candidate = &net.IPNet{IP: NextIP(candidate.IP, cidr.AddressCount(candidate)+2), Mask:mask}
+		candidate = &net.IPNet{IP: NextIP(candidate.IP, cidr.AddressCount(candidate)+2), Mask: mask}
 	}
 }
 

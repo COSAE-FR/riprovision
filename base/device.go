@@ -10,26 +10,26 @@ import (
 )
 
 type UnifiProvision struct {
-	IP      *net.IP
-	Mask    *net.IPMask
-	VLAN    int
-	Gateway string
-	Iface   string
+	IP            *net.IP
+	Mask          *net.IPMask
+	VLAN          int
+	Gateway       string
+	Iface         string
 	Configuration *provisionConfiguration
 }
 
 type UnifiDevice struct {
 	DeclaredMacAddress string
-	Model        string
-	Platform     string
-	Hostname     string
-	Firmware     string
-	IPAddresses  map[string][]string
-	UpSince      time.Time
-	RebootedAt	 time.Time
-	Essid        string
-	WirelessMode string
-	Provision    *UnifiProvision
+	Model              string
+	Platform           string
+	Hostname           string
+	Firmware           string
+	IPAddresses        map[string][]string
+	UpSince            time.Time
+	RebootedAt         time.Time
+	Essid              string
+	WirelessMode       string
+	Provision          *UnifiProvision
 }
 
 type DHCPDevice struct {
@@ -43,12 +43,11 @@ type Device struct {
 	MacAddress string
 	Unifi      *UnifiDevice
 	DHCP       *DHCPDevice
-	Log *log.Entry
-	busy    bool
-	busyMsg string
-	busyMtx sync.RWMutex
+	Log        *log.Entry
+	busy       bool
+	busyMsg    string
+	busyMtx    sync.RWMutex
 }
-
 
 func (d *Device) String() string {
 	now := time.Now()

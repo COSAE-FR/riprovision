@@ -6,9 +6,9 @@ import (
 
 type ArpEntry struct {
 	MacAddress string
-	IPAddress string
-	Iface string
-	Permanent bool
+	IPAddress  string
+	Iface      string
+	Permanent  bool
 }
 
 type ArpTable map[string]ArpEntry

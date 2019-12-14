@@ -13,7 +13,6 @@ import (
 	"time"
 )
 
-
 // IsBusy states whether or not this Device is ready to receive commands.
 func (d *Device) IsBusy() bool {
 	d.busyMtx.RLock()
@@ -32,7 +31,7 @@ func (d *Device) setBusy(msg string) error {
 	return nil
 }
 
-func (device *Device)generateConfiguration() (conf string, err error)  {
+func (device *Device) generateConfiguration() (conf string, err error) {
 	if !device.IsReady() {
 		return "", errors.New("device is not ready")
 	}
@@ -44,7 +43,7 @@ func (device *Device)generateConfiguration() (conf string, err error)  {
 		return
 	}
 	tmplString, found := device.Unifi.Provision.Configuration.Templates[modelTmpl]
-	if found ==false {
+	if found == false {
 		device.Log.Errorf("Cannot find configurator template for device model: %s", device.Unifi.Model)
 		err = errors.New("cannot find configurator template for device")
 		return
@@ -63,8 +62,7 @@ func (device *Device)generateConfiguration() (conf string, err error)  {
 	return
 }
 
-
-func (d *Device)IsReady() bool  {
+func (d *Device) IsReady() bool {
 	if d.Unifi != nil && d.Unifi.Provision != nil {
 		provision := d.Unifi.Provision
 		if len(provision.Iface) > 0 && provision.IP != nil && provision.Mask != nil {
@@ -155,7 +153,7 @@ func (d *Device) Reboot() error {
 }
 
 func (d *Device) withSSHClient(msg string, callback func(*ssh.Client)) error {
-	var client  *ssh.Client
+	var client *ssh.Client
 	if err := d.setBusy(msg); err != nil {
 		return err
 	}
@@ -188,7 +186,7 @@ func (d *Device) withSSHClient(msg string, callback func(*ssh.Client)) error {
 func (d *Device) getSSHClient(user string) *ssh.Client {
 	clientConfig := &ssh.ClientConfig{
 		Timeout:         2 * time.Second,
-		User:           user,
+		User:            user,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 

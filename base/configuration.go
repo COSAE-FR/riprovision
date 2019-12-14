@@ -25,7 +25,7 @@ type sshAuthMethod struct {
 }
 
 type SSHConfiguration struct {
-	Usernames      []string `yaml:"users"`
+	Usernames      []string        `yaml:"users"`
 	SSHAuthMethods []sshAuthMethod `yaml:"methods"`
 	sshAuthMethods []ssh.AuthMethod
 }
@@ -37,7 +37,7 @@ type provisionConfiguration struct {
 	InterfaceNames []string               `yaml:"provision_interfaces"`
 	SyslogPort     int                    `yaml:"syslog_port"`
 	SSH            SSHConfiguration       `yaml:"ssh"`
-	Models 			configurationModels		`yaml:"models"`
+	Models         configurationModels    `yaml:"models"`
 	Templates      configurationTemplates `yaml:"templates"`
 }
 
@@ -45,7 +45,7 @@ type Server struct {
 	Interface string `yaml:"interface"`
 	Iface     *net.Interface
 
-	LogLevel 	string `yaml:"log_level"`
+	LogLevel string `yaml:"log_level"`
 
 	MaxDevices int `yaml:"max_devices"`
 	MACPrefix  []string
@@ -69,7 +69,7 @@ type Server struct {
 
 type OutPacket struct {
 	data []byte
-	len int
+	len  int
 }
 
 func NewOutPacket(data []byte) OutPacket {
@@ -126,7 +126,7 @@ func (server *Server) Stop() error {
 			device, found := server.GetDevice(deviceKeyInt.(string))
 			if found {
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
-					server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask }
+					server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
 				}
 			}
 		}

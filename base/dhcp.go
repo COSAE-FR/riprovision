@@ -28,7 +28,7 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 			MacAddress: mac,
 			Unifi:      nil,
 			DHCP:       nil,
-			Log: deviceLogger,
+			Log:        deviceLogger,
 		}
 	}
 	if device.DHCP == nil || device.DHCP.ClientIP == nil {

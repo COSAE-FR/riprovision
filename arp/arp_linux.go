@@ -35,7 +35,7 @@ func Table() ArpTable {
 		line := s.Text()
 		fields := strings.Fields(line)
 		permanent := fields[f_Flags] == "0x6"
-		table[fields[f_IPAddr]] = ArpEntry{fields[f_HWAddr], fields[f_IPAddr], fields[f_Device], permanent }
+		table[fields[f_IPAddr]] = ArpEntry{fields[f_HWAddr], fields[f_IPAddr], fields[f_Device], permanent}
 	}
 
 	return table
