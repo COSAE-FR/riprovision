@@ -31,15 +31,19 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 			Log:        deviceLogger,
 		}
 	}
-	if device.DHCP == nil || device.DHCP.ClientIP == nil {
+	if device.DHCP == nil || device.DHCP.ClientIP == nil || time.Now().After(device.DHCP.Expiry) {
 		device.Log.Debug("DHCP handler: no DHCP informations")
 		freeNetwork, err := h.GetDHCPNetwork()
 		if err != nil {
 			device.Log.Printf("No free network")
 			return
 		}
-		device.Log.Debugf("DHCP hanler: asking for address creation: %s", freeNetwork.String())
-		h.AddNet <- *freeNetwork
+		device.Log.Debugf("DHCP handler: asking for address creation: %s", freeNetwork.String())
+		//h.AddNet <- *freeNetwork
+		h.ManageNet <- InterfaceAddress{
+			Network:   *freeNetwork,
+			Interface: h.Interface,
+		}
 		_, targetNetwork, err := net.ParseCIDR(freeNetwork.String())
 		if err != nil {
 			device.Log.Errorf("Cannot get server IP: %v", err)
@@ -51,11 +55,13 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 			ServerIP:    &serverIP,
 			NetworkMask: &freeNetwork.Mask,
 			ClientIP:    &clientIP,
-			Expiry:      time.Now().Add(60 * time.Minute),
+			Expiry:      time.Now().Add(h.DHCP.leaseDuration),
 		}
-		h.AddDevice(device)
 
+	} else {
+		device.DHCP.Expiry = time.Now().Add(h.DHCP.leaseDuration)
 	}
+	h.AddDevice(device)
 	serverOptions := dhcp4.Options{
 		dhcp4.OptionSubnetMask:       *device.DHCP.NetworkMask,
 		dhcp4.OptionRouter:           device.DHCP.ServerIP.To4(), // Presuming Server is also your router
@@ -64,21 +70,17 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 	switch msgType {
 
 	case dhcp4.Discover:
-		return dhcp4.ReplyPacket(p, dhcp4.Offer, *device.DHCP.ServerIP, *device.DHCP.ClientIP, 60*time.Minute,
+		return dhcp4.ReplyPacket(p, dhcp4.Offer, *device.DHCP.ServerIP, *device.DHCP.ClientIP, h.DHCP.leaseDuration,
 			serverOptions.SelectOrderOrAll(options[dhcp4.OptionParameterRequestList]))
 
 	case dhcp4.Request:
-		// DIsable : ubiquiti devices sends from 0.0.0.0 their requests server ID
-		/*if server, ok := options[dhcp4.OptionServerIdentifier]; ok && !net.IP(server).Equal(*device.DHCP.ServerIP) {
-			return nil // Message not for this dhcp server
-		} */
 		reqIP := net.IP(options[dhcp4.OptionRequestedIPAddress])
 		if reqIP == nil {
 			reqIP = net.IP(p.CIAddr())
 		}
 
 		if len(reqIP) == 4 && !reqIP.Equal(net.IPv4zero) {
-			return dhcp4.ReplyPacket(p, dhcp4.ACK, *device.DHCP.ServerIP, reqIP, 60*time.Minute,
+			return dhcp4.ReplyPacket(p, dhcp4.ACK, *device.DHCP.ServerIP, reqIP, h.DHCP.leaseDuration,
 				serverOptions.SelectOrderOrAll(options[dhcp4.OptionParameterRequestList]))
 
 		}

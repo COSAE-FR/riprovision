@@ -10,6 +10,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"time"
 )
 
 type dhcpConfiguration struct {
@@ -17,6 +18,8 @@ type dhcpConfiguration struct {
 	BaseNetwork   string `yaml:"base_network"`
 	baseNetwork   *net.IPNet
 	NetworkPrefix int `yaml:"network_prefix"`
+	LeaseMinutes int `yaml:"lease_duration"`
+	leaseDuration time.Duration
 }
 
 type sshAuthMethod struct {
@@ -58,14 +61,18 @@ type Server struct {
 
 	Handler *PacketHandler
 
-	AddNet    chan net.IPNet
-	RemoveNet chan net.IPNet
+	//AddNet    chan net.IPNet
+	//RemoveNet chan net.IPNet
+	ManageNet chan InterfaceAddress
 	StopNet   chan int
 
 	WriteNet  chan OutPacket
 	StopWrite chan int
 
 	StopListen chan int
+
+	StopClean chan int
+	CleanTicker *time.Ticker
 
 	Cache *lru.Cache
 }
@@ -111,8 +118,11 @@ func (server *Server) Start() error {
 	server.StopListen = make(chan int)
 	server.StopWrite = make(chan int)
 	server.WriteNet = make(chan OutPacket, 100)
+	server.StopClean = make(chan int)
 	if server.DHCP.Enable {
 		go Serve(server.Handler.DHCP, server.WriteNet, server)
+		server.CleanTicker = time.NewTicker(server.DHCP.leaseDuration)
+		go server.LocalAddressCLeaner()
 	}
 	go server.Handler.Listen(server.StopListen)
 	go server.HandleInform(server.Handler.Inform)
@@ -124,12 +134,21 @@ func (server *Server) Stop() error {
 	// Stop the service here
 	log.Info("Stopping riprovision server")
 	server.StopListen <- 1
+	server.StopClean <- 1
 	if server.DHCP.Enable {
 		for _, deviceKeyInt := range server.Cache.Keys() {
 			device, found := server.GetDevice(deviceKeyInt.(string))
 			if found {
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
-					server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
+					//server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
+					server.ManageNet <- InterfaceAddress{
+						Network:   net.IPNet{
+							IP: *device.DHCP.ServerIP,
+							Mask: *device.DHCP.NetworkMask,
+						},
+						Interface: server.Interface,
+						Remove:    true,
+					}
 				}
 			}
 		}
@@ -222,6 +241,8 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 		case "keyfile":
 			if key, ok := pssh.ReadPrivateKey(m.Path, m.Password); ok {
 				c.Provision.SSH.sshAuthMethods = append(c.Provision.SSH.sshAuthMethods, key)
+			} else {
+				log.Warnf("Cannot add SSH keyfile %s", m.Path)
 			}
 		default:
 			errs = append(errs, fmt.Errorf("unknown auth method %q", m.Type))
@@ -239,7 +260,10 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 		if c.DHCP.NetworkPrefix == 0 {
 			c.DHCP.NetworkPrefix = 27
 		}
-
+		if c.DHCP.LeaseMinutes == 0 {
+			c.DHCP.LeaseMinutes = 15
+		}
+		c.DHCP.leaseDuration = time.Duration(c.DHCP.LeaseMinutes) * time.Minute
 	}
 	_, c.DHCP.baseNetwork, err = net.ParseCIDR(c.DHCP.BaseNetwork)
 	if err != nil {

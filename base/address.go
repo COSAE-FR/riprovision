@@ -65,6 +65,44 @@ func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
 	return network.GetFreeNetworkBlacklist(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix, networks)
 }
 
+type InterfaceAddress struct {
+	Network net.IPNet
+	Interface string
+	Remove bool
+}
+
+func LocalAddressManager(address chan InterfaceAddress, exit chan int) {
+	log.Debugf("interface IP address manager started")
+	for {
+		select {
+		case <-exit:
+			log.Info("interface IP address manager exit requested")
+			return
+		case ipNetwork := <-address:
+			log.Debugf("New address to add: %s", ipNetwork.Network.String())
+			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network.String())
+			if err != nil {
+				log.Errorf("Cannot get server IP: %+v", err)
+				continue
+			}
+			serverIP := network.NextIP(targetNetwork.IP, 1)
+			if ipNetwork.Remove {
+				err = RemoveInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
+				if err != nil {
+					log.Errorf("Cannot remove server IP: %v", err)
+				}
+				continue
+			} else {
+				err = AddInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
+				if err != nil {
+					log.Errorf("Cannot add server IP: %v", err)
+				}
+				continue
+			}
+		}
+	}
+}
+
 func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IPNet, exit chan int) {
 	log.Debugf("interface IP address manager started")
 	for {
@@ -100,6 +138,34 @@ func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IP
 				continue
 			}
 			continue
+		}
+	}
+}
+
+func (server *Server) LocalAddressCLeaner() {
+	log.Debugf("interface IP address cleaner started")
+	for {
+		select {
+		case <-server.StopClean:
+			log.Info("Interface IP address cleaner exit requested")
+			return
+		case <- server.CleanTicker.C:
+			now := time.Now()
+			log.Debugf("Cleaner started at %s", now.String())
+			for _, deviceKeyInt := range server.Cache.Keys() {
+				device, found := server.GetDevice(deviceKeyInt.(string))
+				if found {
+					if device.DHCP != nil && device.DHCP.ServerIP != nil && now.After(device.DHCP.Expiry) {
+						log.Debugf("Cleaner: removing expired network for server: %s", device.DHCP.ServerIP.String())
+						//server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
+						server.ManageNet <- InterfaceAddress{
+							Network:   net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask},
+							Interface: server.Interface,
+							Remove:    true,
+						}
+					}
+				}
+			}
 		}
 	}
 }

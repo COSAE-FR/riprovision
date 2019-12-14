@@ -68,14 +68,22 @@ func New(cfg Config) (*base.Server, error) {
 	// Create IP setter
 	if configuration.DHCP.Enable {
 		log.Infof("Creating the interface IP address handler")
-		configuration.AddNet = make(chan net.IPNet, 100)
+		/*configuration.AddNet = make(chan net.IPNet, 100)
 		configuration.RemoveNet = make(chan net.IPNet, 100)
-		configuration.StopNet = make(chan int)
+		configuration.StopNet = make(chan int */
+		configuration.ManageNet = ManageNet
+		configuration.StopNet = StopNet
+
 		configuration.Cache, err = lru.NewWithEvict(configuration.MaxDevices, func(key interface{}, value interface{}) {
 			if value != nil {
 				device := value.(base.Device)
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
-					configuration.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
+					//configuration.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
+					configuration.ManageNet <- base.InterfaceAddress{
+						Network:   net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask},
+						Interface: configuration.Interface,
+						Remove:    true,
+					}
 				}
 			}
 		})
@@ -83,7 +91,7 @@ func New(cfg Config) (*base.Server, error) {
 			log.Errorf("cannot create device cache: %v", err)
 			return configuration, errors.New("cannot create device cache")
 		}
-		go configuration.LocalAddressManager(configuration.AddNet, configuration.RemoveNet, configuration.StopNet)
+		//go configuration.LocalAddressManager(configuration.AddNet, configuration.RemoveNet, configuration.StopNet)
 	} else {
 		configuration.Cache, err = lru.New(configuration.MaxDevices)
 		if err != nil {
@@ -95,19 +103,33 @@ func New(cfg Config) (*base.Server, error) {
 	return configuration, nil
 }
 
+var ManageNet    chan base.InterfaceAddress
+var StopNet   chan int
+
+func init() {
+	ManageNet = make(chan base.InterfaceAddress, 100)
+	StopNet = make(chan int)
+
+	go base.LocalAddressManager(ManageNet, StopNet)
+}
+
 func main() {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:          true,
 		DisableLevelTruncation: true,
 	})
 	log.SetOutput(os.Stderr)
+
 	cfg := Config{}
 
 	configurator := &easyconfig.Configurator{
 		ProgramName: "provision",
 	}
 
-	easyconfig.ParseFatal(configurator, &cfg)
+	err := easyconfig.Parse(configurator, &cfg)
+	if err != nil {
+		log.Fatalf("%v", err)
+	}
 	log.Debugf("Started with %#v", cfg)
 	service.Main(&service.Info{
 		Name:      "riprovisioner",

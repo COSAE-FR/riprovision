@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	pssh "github.com/gcrahay/riprovision/ssh"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
@@ -103,6 +104,7 @@ func (d *Device) doProvision(c *ssh.Client) {
 		d.Log.Errorf("Cannot generate configurator: %v", err)
 		return
 	}
+	log.Tracef("Configuration to upload:\n %s", configurationString)
 
 	content := []byte(configurationString)
 
