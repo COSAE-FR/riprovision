@@ -24,6 +24,16 @@ type Config struct {
 func New(cfg Config) (*base.Server, error) {
 	var err error
 	configuration, errs := base.LoadConfig(cfg.File)
+	if len(configuration.LogFile) > 0 {
+		f, err := os.OpenFile(configuration.LogFile, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0644)
+		if err == nil {
+			configuration.LogFileWriter = f
+			log.SetOutput(f)
+		} else {
+			log.Errorf("Cannot open log file %s. Logging to stdout.", configuration.LogFile)
+		}
+
+	}
 	logLevel, err := log.ParseLevel(configuration.LogLevel)
 	if err != nil {
 		logLevel = log.WarnLevel

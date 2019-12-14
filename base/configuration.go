@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v2"
 	"io/ioutil"
 	"net"
+	"os"
 )
 
 type dhcpConfiguration struct {
@@ -46,6 +47,8 @@ type Server struct {
 	Iface     *net.Interface
 
 	LogLevel string `yaml:"log_level"`
+	LogFile  string `yaml:"log_file"`
+	LogFileWriter *os.File
 
 	MaxDevices int `yaml:"max_devices"`
 	MACPrefix  []string
@@ -133,6 +136,10 @@ func (server *Server) Stop() error {
 		server.StopNet <- 1
 	}
 	server.StopWrite <- 1
+	if server.LogFileWriter != nil && server.LogFileWriter.Fd() > 0 {
+		_ = server.LogFileWriter.Sync()
+		_ = server.LogFileWriter.Close()
+	}
 	return nil
 }
 
