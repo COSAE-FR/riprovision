@@ -2,6 +2,7 @@ package base
 
 import (
 	"fmt"
+	"github.com/gcrahay/riprovision/address"
 	pssh "github.com/gcrahay/riprovision/ssh"
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/sirupsen/logrus"
@@ -61,9 +62,8 @@ type Server struct {
 
 	Handler *PacketHandler
 
-	//AddNet    chan net.IPNet
-	//RemoveNet chan net.IPNet
-	ManageNet chan InterfaceAddress
+	NetManager address.Manager // RPC client to talk to the interface address manager
+	ManageNet chan address.InterfaceAddress
 	StopNet   chan int
 
 	WriteNet  chan OutPacket
@@ -141,7 +141,7 @@ func (server *Server) Stop() error {
 			if found {
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
 					//server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
-					server.ManageNet <- InterfaceAddress{
+					server.ManageNet <- address.InterfaceAddress{
 						Network:   net.IPNet{
 							IP: *device.DHCP.ServerIP,
 							Mask: *device.DHCP.NetworkMask,

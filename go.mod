@@ -13,6 +13,7 @@ require (
 	github.com/google/gopacket v1.1.17
 	github.com/hashicorp/golang-lru v0.5.3
 	github.com/krolaw/dhcp4 v0.0.0-20190909130307-a50d88189771
+	github.com/natefinch/pie v0.0.0-20170715172608-9a0d72014007
 	github.com/ogier/pflag v0.0.1 // indirect
 	github.com/sirupsen/logrus v1.4.2
 	golang.org/x/crypto v0.0.0-20191206172530-e9b2fee46413
@@ -20,6 +21,6 @@ require (
 	gopkg.in/hlandau/configurable.v1 v1.0.1 // indirect
 	gopkg.in/hlandau/easyconfig.v1 v1.0.17
 	gopkg.in/hlandau/service.v2 v2.0.16
-	gopkg.in/hlandau/svcutils.v1 v1.0.10 // indirect
+	gopkg.in/hlandau/svcutils.v1 v1.0.10
 	gopkg.in/yaml.v2 v2.2.7
 )

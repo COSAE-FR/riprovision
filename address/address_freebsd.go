@@ -1,6 +1,6 @@
 // +build freebsd
 
-package base
+package address
 
 import (
 	log "github.com/sirupsen/logrus"

@@ -2,6 +2,7 @@ package base
 
 import (
 	"fmt"
+	"github.com/gcrahay/riprovision/address"
 	"github.com/gcrahay/riprovision/network"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -65,20 +66,14 @@ func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
 	return network.GetFreeNetworkBlacklist(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix, networks)
 }
 
-type InterfaceAddress struct {
-	Network net.IPNet
-	Interface string
-	Remove bool
-}
-
-func LocalAddressManager(address chan InterfaceAddress, exit chan int) {
+func LocalAddressManager(addressChan chan address.InterfaceAddress, exit chan int) {
 	log.Debugf("interface IP address manager started")
 	for {
 		select {
 		case <-exit:
 			log.Info("interface IP address manager exit requested")
 			return
-		case ipNetwork := <-address:
+		case ipNetwork := <-addressChan:
 			log.Debugf("New address to add: %s", ipNetwork.Network.String())
 			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network.String())
 			if err != nil {
@@ -87,57 +82,18 @@ func LocalAddressManager(address chan InterfaceAddress, exit chan int) {
 			}
 			serverIP := network.NextIP(targetNetwork.IP, 1)
 			if ipNetwork.Remove {
-				err = RemoveInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
+				err = address.RemoveInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
 				if err != nil {
 					log.Errorf("Cannot remove server IP: %v", err)
 				}
 				continue
 			} else {
-				err = AddInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
+				err = address.AddInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
 				if err != nil {
 					log.Errorf("Cannot add server IP: %v", err)
 				}
 				continue
 			}
-		}
-	}
-}
-
-func (server *Server) LocalAddressManager(add chan net.IPNet, remove chan net.IPNet, exit chan int) {
-	log.Debugf("interface IP address manager started")
-	for {
-		select {
-		case <-exit:
-			log.Info("interface IP address manager exit requested")
-			return
-		case ipNetwork := <-add:
-			log.Debugf("New address to add: %s", ipNetwork.String())
-			_, targetNetwork, err := net.ParseCIDR(ipNetwork.String())
-			if err != nil {
-				log.Errorf("Cannot get server IP: %+v", err)
-				continue
-			}
-			serverIP := network.NextIP(targetNetwork.IP, 1)
-			err = AddInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
-			if err != nil {
-				log.Errorf("Cannot add server IP: %v", err)
-				continue
-			}
-			continue
-		case ipNetwork := <-remove:
-			log.Debugf("New address to remove: %s", ipNetwork.String())
-			_, targetNetwork, err := net.ParseCIDR(ipNetwork.String())
-			if err != nil {
-				log.Errorf("Cannot get server IP: %v", err)
-				continue
-			}
-			serverIP := network.NextIP(targetNetwork.IP, 1)
-			err = RemoveInterfaceIP(serverIP, ipNetwork.Mask, server.Interface)
-			if err != nil {
-				log.Errorf("Cannot remove server IP: %v", err)
-				continue
-			}
-			continue
 		}
 	}
 }
@@ -158,7 +114,7 @@ func (server *Server) LocalAddressCLeaner() {
 					if device.DHCP != nil && device.DHCP.ServerIP != nil && now.After(device.DHCP.Expiry) {
 						log.Debugf("Cleaner: removing expired network for server: %s", device.DHCP.ServerIP.String())
 						//server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
-						server.ManageNet <- InterfaceAddress{
+						server.ManageNet <- address.InterfaceAddress{
 							Network:   net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask},
 							Interface: server.Interface,
 							Remove:    true,
@@ -166,6 +122,27 @@ func (server *Server) LocalAddressCLeaner() {
 					}
 				}
 			}
+		}
+	}
+}
+
+
+func (server *Server) RemoteAddressManager(address chan address.InterfaceAddress, exit chan int) {
+	log.Debugf("interface IP address manager started")
+	for {
+		select {
+		case <-exit:
+			log.Info("interface IP address manager exit requested")
+			return
+		case ipNetwork := <-address:
+			log.Debugf("New address to add: %s", ipNetwork.Network.String())
+			msg, err := server.NetManager.Manage(&ipNetwork)
+			if err != nil {
+				log.Errorf("Cannot manager server IP: %v (%s)", err, msg)
+			} else {
+				log.Debugf("Server IP managed: %s", msg)
+			}
+			continue
 		}
 	}
 }

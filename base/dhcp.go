@@ -1,6 +1,7 @@
 package base
 
 import (
+	"github.com/gcrahay/riprovision/address"
 	"github.com/gcrahay/riprovision/arp"
 	"github.com/gcrahay/riprovision/network"
 	"github.com/krolaw/dhcp4"
@@ -40,7 +41,7 @@ func (h *Server) ServeDHCP(p dhcp4.Packet, msgType dhcp4.MessageType, options dh
 		}
 		device.Log.Debugf("DHCP handler: asking for address creation: %s", freeNetwork.String())
 		//h.AddNet <- *freeNetwork
-		h.ManageNet <- InterfaceAddress{
+		h.ManageNet <- address.InterfaceAddress{
 			Network:   *freeNetwork,
 			Interface: h.Interface,
 		}
