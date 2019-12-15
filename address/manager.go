@@ -11,6 +11,10 @@ type manager struct {
 	log *log.Entry
 }
 
+type ManagerSettings struct {
+	LogLevel string
+}
+
 func Setup() {
 	log.SetOutput(os.Stderr)
 	logger := log.WithFields(log.Fields{
@@ -41,5 +45,17 @@ func (m manager) Manage(ipNetwork *InterfaceAddress, response *string) error {
 		*response = "NOK "+ipNetwork.Network.String()
 	}
 	return err
+}
+
+func (m manager) Configure(settings *ManagerSettings, response *string) error {
+	if len(settings.LogLevel) > 0 {
+		logLevel, err := log.ParseLevel(settings.LogLevel)
+		if err != nil {
+			logLevel = log.WarnLevel
+		}
+		log.SetLevel(logLevel)
+		*response = "OK"
+	}
+	return nil
 }
 

@@ -75,8 +75,12 @@ func New(cfg Config) (*base.Server, error) {
 
 		configuration.NetManager, err = address.SetupAddressClient(configuration.LogFileWriter)
 		if err != nil {
-			log.Errorf("Cannot setup Address Manager client")
+			log.Errorf("Cannot setup Address Manager client: %v", err)
 			return configuration, err
+		}
+		_, err = configuration.NetManager.Configure(&address.ManagerSettings{LogLevel: configuration.LogLevel})
+		if err != nil {
+			log.Errorf("Cannot configure Address Manager server: %v", err)
 		}
 		go configuration.RemoteAddressManager(configuration.ManageNet, configuration.StopNet)
 
