@@ -34,6 +34,8 @@ func New(cfg Config) (*base.Server, error) {
 			log.Errorf("Cannot open log file %s. Logging to stdout.", configuration.LogFile)
 		}
 
+	} else {
+		configuration.LogFileWriter = os.Stderr
 	}
 	logLevel, err := log.ParseLevel(configuration.LogLevel)
 	if err != nil {
@@ -71,7 +73,7 @@ func New(cfg Config) (*base.Server, error) {
 		configuration.ManageNet = make(chan address.InterfaceAddress, 100)
 		configuration.StopNet = make(chan int)
 
-		configuration.NetManager, err = address.SetupAddressClient()
+		configuration.NetManager, err = address.SetupAddressClient(configuration.LogFileWriter)
 		if err != nil {
 			log.Errorf("Cannot setup Address Manager client")
 			return configuration, err

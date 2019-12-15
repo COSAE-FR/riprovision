@@ -140,7 +140,6 @@ func (server *Server) Stop() error {
 			device, found := server.GetDevice(deviceKeyInt.(string))
 			if found {
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
-					//server.RemoveNet <- net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask}
 					server.ManageNet <- address.InterfaceAddress{
 						Network:   net.IPNet{
 							IP: *device.DHCP.ServerIP,

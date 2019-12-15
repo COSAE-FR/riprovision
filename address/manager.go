@@ -4,6 +4,7 @@ import (
 	"github.com/natefinch/pie"
 	log "github.com/sirupsen/logrus"
 	"net/rpc/jsonrpc"
+	"os"
 )
 
 type manager struct {
@@ -11,6 +12,7 @@ type manager struct {
 }
 
 func Setup() {
+	log.SetOutput(os.Stderr)
 	logger := log.WithFields(log.Fields{
 		"app": "riproision",
 		"process": "address",
