@@ -19,8 +19,8 @@ type dhcpConfiguration struct {
 	BaseNetwork   string `yaml:"base_network"`
 	baseNetwork   *net.IPNet
 	NetworkPrefix int `yaml:"network_prefix"`
-	LeaseMinutes int `yaml:"lease_duration"`
-	leaseDuration time.Duration
+	LeaseMinutes  int `yaml:"lease_duration"`
+	LeaseDuration time.Duration
 }
 
 type sshAuthMethod struct {
@@ -101,7 +101,7 @@ func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
 				log.Errorf("WritePacket: error lengths differ: announced %d vs computed %d", pckt.len, len(pckt.data))
 				continue
 			}
-			log.Debugf("New packet to write in write goroutine %d", pckt.len)
+			log.Debugf("NewHandler packet to write in write goroutine %d", pckt.len)
 			err := handler.Write(pckt.data)
 			if err != nil {
 				log.Errorf("Write packet: error while writing: %+v", err)
@@ -116,14 +116,18 @@ func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
 }
 
 func (server *Server) Start() error {
+	logger := server.Log.WithFields(log.Fields{
+		"component": "start",
+	})
+	logger.Info("Starting server")
 	server.StopListen = make(chan int)
 	server.StopWrite = make(chan int)
 	server.WriteNet = make(chan OutPacket, 100)
 	server.StopClean = make(chan int)
 	if server.DHCP.Enable {
-		//go Serve(server.Handler.DHCP, server.WriteNet, server)
-		go server.DHCPServer(server.Handler.DHCP, server.WriteNet)
-		server.CleanTicker = time.NewTicker(server.DHCP.leaseDuration)
+		logger.Debug("Starting DHCP components")
+		go server.DHCPServer()
+		server.CleanTicker = time.NewTicker(server.DHCP.LeaseDuration)
 		go server.LocalAddressCLeaner()
 	}
 	go server.Handler.Listen(server.StopListen)
@@ -133,8 +137,10 @@ func (server *Server) Start() error {
 }
 
 func (server *Server) Stop() error {
-	// Stop the service here
-	log.Info("Stopping riprovision server")
+	logger := server.Log.WithFields(log.Fields{
+		"component": "stop",
+	})
+	logger.Info("Stopping server")
 	server.StopListen <- 1
 	server.StopClean <- 1
 	if server.DHCP.Enable {
@@ -189,6 +195,10 @@ func (server *Server) HasDevice(mac string) bool {
 
 // LoadConfig reads a YAML file and converts it to a Server object
 func LoadConfig(fileName string) (c *Server, errs []error) {
+	logger := log.WithFields(log.Fields{
+		"app": "riprovision",
+		"component": "config_loader",
+	})
 	c = &Server{}
 
 	file, err := ioutil.ReadFile(fileName)
@@ -243,7 +253,7 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 			if key, ok := pssh.ReadPrivateKey(m.Path, m.Password); ok {
 				c.Provision.SSH.sshAuthMethods = append(c.Provision.SSH.sshAuthMethods, key)
 			} else {
-				log.Warnf("Cannot add SSH keyfile %s", m.Path)
+				logger.Warnf("Cannot add SSH keyfile %s", m.Path)
 			}
 		default:
 			errs = append(errs, fmt.Errorf("unknown auth method %q", m.Type))
@@ -264,7 +274,7 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 		if c.DHCP.LeaseMinutes == 0 {
 			c.DHCP.LeaseMinutes = 15
 		}
-		c.DHCP.leaseDuration = time.Duration(c.DHCP.LeaseMinutes) * time.Minute
+		c.DHCP.LeaseDuration = time.Duration(c.DHCP.LeaseMinutes) * time.Minute
 	}
 	_, c.DHCP.baseNetwork, err = net.ParseCIDR(c.DHCP.BaseNetwork)
 	if err != nil {

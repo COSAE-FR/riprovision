@@ -22,13 +22,20 @@ type PacketHandler struct {
 	ARP    chan gopacket.Packet
 	Inform chan gopacket.Packet
 	DHCP   chan gopacket.Packet
+	log *log.Entry
 }
 
-func New(iface *net.Interface) (*PacketHandler, error) {
-	handler := &PacketHandler{iface: iface}
+func NewHandler(iface *net.Interface) (*PacketHandler, error) {
+	handler := &PacketHandler{
+		iface: iface,
+		log: log.WithFields(log.Fields{
+			"app": "riprovision",
+			"component": "capture",
+		}),
+	}
 	handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
 	if err != nil {
-		log.Errorf("Unable to open packet capture on interface %s", iface.Name)
+		handler.log.Errorf("Unable to open packet capture on interface %s", iface.Name)
 		return handler, err
 	}
 	handler.handle = handle
@@ -47,36 +54,36 @@ func (handler *PacketHandler) Close() {
 }
 
 func (handler *PacketHandler) Listen(stop chan int) {
-	log.Debugf("Listening on interface %s", handler.iface.Name)
+	handler.log.Debugf("Listening on interface %s", handler.iface.Name)
 	src := gopacket.NewPacketSource(handler.handle, layers.LayerTypeEthernet)
 	in := src.Packets()
 	for {
 		var packet gopacket.Packet
 		select {
 		case <-stop:
-			log.Info("Received a listener kill switch")
+			handler.log.Info("Received a listener kill switch")
 			return
 		case packet = <-in:
-			log.Debug("Received a new packet")
+			handler.log.Debug("Received a new packet")
 			udpLayer := packet.Layer(layers.LayerTypeUDP)
 			if udpLayer != nil {
-				log.Debug("New packet is UDP")
+				handler.log.Debug("New packet is UDP")
 				udp := udpLayer.(*layers.UDP)
 				if udp.DstPort == InformPort {
-					log.Debug("New packet is Inform")
+					handler.log.Debug("New packet is Inform")
 					ipLayer := packet.Layer(layers.LayerTypeIPv4)
 					if ipLayer != nil {
 						if ipLayer.(*layers.IPv4).DstIP.String() == net.IPv4bcast.String() && udp.Length > 4 {
-							log.Debug("Sending packet to Inform handler")
+							handler.log.Debug("Sending packet to Inform handler")
 							handler.Inform <- packet
 							continue
 						}
-						log.Errorf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast), net.IPv4bcast.String(), udp.Length)
+						handler.log.Errorf("Malformed packet: %s: %t -> %s  (%d)", ipLayer.(*layers.IPv4).DstIP.String(), bytes.Equal(ipLayer.(*layers.IPv4).DstIP, net.IPv4bcast), net.IPv4bcast.String(), udp.Length)
 						continue
 					}
-					log.Errorf("Cannot extract IP layer")
+					handler.log.Errorf("Cannot extract IP layer")
 				} else if udp.DstPort == DHCPPort {
-					log.Debug("New packet is DHCP")
+					handler.log.Debug("NewHandler packet is DHCP")
 					handler.DHCP <- packet
 				}
 			}

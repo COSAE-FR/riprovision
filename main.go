@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	NoDHCPFilter = "(udp dst port 10001) and not vlan"
-	GlobalFilter = "(udp dst port 67 or udp dst port 10001) and not vlan"
+	NoDHCPFilter = "ip and udp dst port 10001 and not vlan"
+	GlobalFilter = "ip and (udp dst port 67 or udp dst port 10001) and not vlan"
 )
 
 type Config struct {
@@ -25,18 +25,6 @@ type Config struct {
 func New(cfg Config) (*base.Server, error) {
 	var err error
 	configuration, errs := base.LoadConfig(cfg.File)
-	if len(configuration.LogFile) > 0 {
-		f, err := os.OpenFile(configuration.LogFile, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0644)
-		if err == nil {
-			configuration.LogFileWriter = f
-			log.SetOutput(f)
-		} else {
-			log.Errorf("Cannot open log file %s. Logging to stdout.", configuration.LogFile)
-		}
-
-	} else {
-		configuration.LogFileWriter = os.Stderr
-	}
 	logLevel, err := log.ParseLevel(configuration.LogLevel)
 	if err != nil {
 		logLevel = log.WarnLevel
@@ -45,45 +33,60 @@ func New(cfg Config) (*base.Server, error) {
 	configuration.Log = log.WithFields(log.Fields{
 		"app": "riprovision",
 	})
+	logger := configuration.Log.WithFields(log.Fields{
+		"component": "privileged_init",
+	})
+	if len(configuration.LogFile) > 0 {
+		f, err := os.OpenFile(configuration.LogFile, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0644)
+		if err == nil {
+			configuration.LogFileWriter = f
+			log.SetOutput(f)
+		} else {
+			logger.Errorf("Cannot open log file %s. Logging to stdout.", configuration.LogFile)
+		}
+
+	} else {
+		configuration.LogFileWriter = os.Stderr
+	}
 	if len(errs) > 0 {
-		log.Errorf("Found %d error(s) loading the config file:", len(errs))
+		logger.Errorf("Found %d error(s) loading the config file:", len(errs))
 		for i, e := range errs {
-			log.Errorf("Error %d: %s", i, e.Error())
+			logger.Errorf("Error %d: %s", i, e.Error())
 		}
 		return configuration, errors.New("errors when parsing config file")
 	}
 
 	// Create capturing server
-	log.Infof("Starting capturing server on interface %s", configuration.Interface)
-	configuration.Handler, err = base.New(configuration.Iface)
+	logger.Infof("Starting capturing server on interface %s", configuration.Interface)
+	configuration.Handler, err = base.NewHandler(configuration.Iface)
 	if err != nil {
 		return configuration, fmt.Errorf("cannot bind to interface %s", configuration.Interface)
 	}
-	log.Debugf("Capturing server started")
+	logger.Debugf("Capturing server started")
 	if configuration.DHCP.Enable {
-		log.Debugf("Setting capturing filter: %s", GlobalFilter)
+		logger.Debugf("Setting capturing filter: %s", GlobalFilter)
 		err = configuration.Handler.SetFilter(GlobalFilter)
 	} else {
-		log.Debugf("Setting capturing filter: %s", NoDHCPFilter)
+		logger.Debugf("Setting capturing filter: %s", NoDHCPFilter)
 		err = configuration.Handler.SetFilter(NoDHCPFilter)
 	}
 	if err != nil {
-		log.Errorf("cannot set capturing server filter: %v", err)
+		logger.Errorf("cannot set capturing server filter: %v", err)
 	}
 
 	if configuration.DHCP.Enable {
-		log.Infof("Creating the interface IP address handler")
+		logger.Infof("Creating interface IP address handler")
 		configuration.ManageNet = make(chan address.InterfaceAddress, 100)
 		configuration.StopNet = make(chan int)
 
 		configuration.NetManager, err = address.SetupAddressClient(configuration.LogFileWriter)
 		if err != nil {
-			log.Errorf("Cannot setup Address Manager client: %v", err)
+			logger.Errorf("Cannot setup Address Manager client: %v", err)
 			return configuration, err
 		}
 		_, err = configuration.NetManager.Configure(&address.ManagerSettings{LogLevel: configuration.LogLevel})
 		if err != nil {
-			log.Errorf("Cannot configure Address Manager server: %v", err)
+			logger.Errorf("Cannot configure Address Manager server: %v", err)
 		}
 		go configuration.RemoteAddressManager(configuration.ManageNet, configuration.StopNet)
 
@@ -100,13 +103,13 @@ func New(cfg Config) (*base.Server, error) {
 			}
 		})
 		if err != nil {
-			log.Errorf("cannot create device cache: %v", err)
+			logger.Errorf("cannot create device cache: %v", err)
 			return configuration, errors.New("cannot create device cache")
 		}
 	} else {
 		configuration.Cache, err = lru.New(configuration.MaxDevices)
 		if err != nil {
-			log.Debugf("cannot create device cache: %v", err)
+			logger.Debugf("cannot create device cache: %v", err)
 			return configuration, errors.New("cannot create device cache")
 		}
 	}

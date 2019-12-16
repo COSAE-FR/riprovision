@@ -18,8 +18,8 @@ type ManagerSettings struct {
 func Setup() {
 	log.SetOutput(os.Stderr)
 	logger := log.WithFields(log.Fields{
-		"app": "riproision",
-		"process": "address",
+		"app": "riprovision",
+		"component": "address_manager",
 		"action": "setup",
 	})
 	logger.Debug("Starting Address Manager")

@@ -312,7 +312,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 			ethernet := ethLayer.(*layers.Ethernet)
 			mac := ethernet.SrcMAC.String()
 			logger := log.WithField("device", mac)
-			if !server.validMAC(mac) {
+			if !server.ValidMAC(mac) {
 				logger.Error("Unauthorized MAC address")
 				continue
 			}
@@ -385,7 +385,7 @@ func (server *Server) NewProvisionDevice(dev *Device) *UnifiProvision {
 			continue
 		}
 		newDevice.Iface = macEntry.Iface
-		if server.validMAC(dev.MacAddress) {
+		if server.ValidMAC(dev.MacAddress) {
 			macIP := net.ParseIP(macEntry.IPAddress)
 			if macIP == nil {
 				dev.Log.Warnf("Cannot parse MAC address table provided IP: %s", macEntry.IPAddress)
