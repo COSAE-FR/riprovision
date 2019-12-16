@@ -53,6 +53,7 @@ type Server struct {
 	LogLevel string `yaml:"log_level"`
 	LogFile  string `yaml:"log_file"`
 	LogFileWriter *os.File
+	Log *log.Entry
 
 	MaxDevices int `yaml:"max_devices"`
 	MACPrefix  []string
@@ -120,7 +121,8 @@ func (server *Server) Start() error {
 	server.WriteNet = make(chan OutPacket, 100)
 	server.StopClean = make(chan int)
 	if server.DHCP.Enable {
-		go Serve(server.Handler.DHCP, server.WriteNet, server)
+		//go Serve(server.Handler.DHCP, server.WriteNet, server)
+		go server.DHCPServer(server.Handler.DHCP, server.WriteNet)
 		server.CleanTicker = time.NewTicker(server.DHCP.leaseDuration)
 		go server.LocalAddressCLeaner()
 	}

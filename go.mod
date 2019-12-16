@@ -12,7 +12,6 @@ require (
 	github.com/erikdubbelboer/gspt v0.0.0-20190125194910-e68493906b83 // indirect
 	github.com/google/gopacket v1.1.17
 	github.com/hashicorp/golang-lru v0.5.3
-	github.com/krolaw/dhcp4 v0.0.0-20190909130307-a50d88189771
 	github.com/natefinch/pie v0.0.0-20170715172608-9a0d72014007
 	github.com/ogier/pflag v0.0.1 // indirect
 	github.com/sirupsen/logrus v1.4.2

@@ -42,6 +42,9 @@ func New(cfg Config) (*base.Server, error) {
 		logLevel = log.WarnLevel
 	}
 	log.SetLevel(logLevel)
+	configuration.Log = log.WithFields(log.Fields{
+		"app": "riprovision",
+	})
 	if len(errs) > 0 {
 		log.Errorf("Found %d error(s) loading the config file:", len(errs))
 		for i, e := range errs {
@@ -115,6 +118,7 @@ func main() {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:          true,
 		DisableLevelTruncation: true,
+		QuoteEmptyFields: true,
 	})
 	log.SetOutput(os.Stderr)
 

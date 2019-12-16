@@ -32,7 +32,6 @@ func New(iface *net.Interface) (*PacketHandler, error) {
 		return handler, err
 	}
 	handler.handle = handle
-	handler.ARP = make(chan gopacket.Packet, 100)
 	handler.Inform = make(chan gopacket.Packet, 100)
 	handler.DHCP = make(chan gopacket.Packet, 100)
 
@@ -59,19 +58,9 @@ func (handler *PacketHandler) Listen(stop chan int) {
 			return
 		case packet = <-in:
 			log.Debug("Received a new packet")
-			arpLayer := packet.Layer(layers.LayerTypeARP)
-			if arpLayer != nil {
-				log.Debug("New packet is ARP")
-				arp := arpLayer.(*layers.ARP)
-				if !bytes.Equal([]byte(handler.iface.HardwareAddr), arp.SourceHwAddress) {
-					handler.ARP <- packet
-				}
-				continue
-			}
 			udpLayer := packet.Layer(layers.LayerTypeUDP)
 			if udpLayer != nil {
 				log.Debug("New packet is UDP")
-
 				udp := udpLayer.(*layers.UDP)
 				if udp.DstPort == InformPort {
 					log.Debug("New packet is Inform")

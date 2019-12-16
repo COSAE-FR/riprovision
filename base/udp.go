@@ -1,12 +1,15 @@
 package base
 
 import (
+	"encoding/binary"
 	"errors"
+	"github.com/gcrahay/riprovision/address"
+	"github.com/gcrahay/riprovision/network"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/krolaw/dhcp4"
 	log "github.com/sirupsen/logrus"
 	"net"
+	"time"
 )
 
 type DHCPPacket struct {
@@ -14,6 +17,7 @@ type DHCPPacket struct {
 	Ethernet *layers.Ethernet
 	IP       *layers.IPv4
 	UDP      *layers.UDP
+	DHCP 	*layers.DHCPv4
 }
 
 func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
@@ -30,13 +34,21 @@ func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
 	if udpLayer == nil {
 		return pckt, errors.New("not a UDP packet")
 	}
+	dhcpLayer := packet.Layer(layers.LayerTypeDHCPv4)
+	if dhcpLayer == nil {
+		return pckt, errors.New("not a DHCP packet")
+	}
 	pckt.Ethernet = ethLayer.(*layers.Ethernet)
 	pckt.IP = ipLayer.(*layers.IPv4)
 	pckt.UDP = udpLayer.(*layers.UDP)
+	pckt.DHCP = dhcpLayer.(*layers.DHCPv4)
 	return pckt, nil
 }
 
-func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) error {
+func (h *Server) DHCPServer(in chan gopacket.Packet, out chan OutPacket) {
+	logger := h.Log.WithFields(log.Fields{
+		"component": "DHCP",
+	})
 	packetOptions := gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
@@ -44,42 +56,113 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 	for {
 		select {
 		case packet := <-in:
-			log.Debug("DHCP: Received a DHCP packet")
 			dhcpPacket, err := preparePacket(packet)
 			if err != nil {
-				log.Errorf("DHCP: Cannot prepare packet: %v", err)
+				logger.Errorf("Cannot prepare packet: %v", err)
 				continue
 			}
 			n := dhcpPacket.UDP.Length
 			if n < 240 { // Packet too small to be DHCP
-				log.Errorf("DHCP: Packet too small: %d", n)
+				log.Errorf("Incoming packet too small: %d", n)
 				continue
 			}
-			req := dhcp4.Packet(dhcpPacket.UDP.Payload)
-			if req.HLen() > 16 { // Invalid size
-				log.Errorf("DHCP: Payload too small: %d", req.HLen())
+			if dhcpPacket.DHCP.HardwareLen > 16 {
+				logger.Errorf("Incoming packet is malformed: hardware length: %d", dhcpPacket.DHCP.HardwareLen)
 				continue
 			}
-			options := req.ParseOptions()
-			var reqType dhcp4.MessageType
-			if t := options[dhcp4.OptionDHCPMessageType]; len(t) != 1 {
-				log.Errorf("DHCP: No or too much DHCP message types %d", len(t))
+			mac := dhcpPacket.Ethernet.SrcMAC.String()
+			if dhcpPacket.DHCP.ClientHWAddr.String() != mac {
+				logger.Errorf("MAC address mismatch between Ethernet and DHCP packets")
 				continue
-			} else {
-				reqType = dhcp4.MessageType(t[0])
-				if reqType < dhcp4.Discover || reqType > dhcp4.Inform {
-					log.Errorf("DHCP: Wrong message type: %+v", reqType)
-					continue
-				}
 			}
-			log.Debug("DHCP: Sending packet to DHCP handler")
-			if res := handler.ServeDHCP(req, reqType, options); res != nil {
-				conf := *handler.(*Server)
-				device, found := conf.GetDevice(dhcpPacket.Ethernet.SrcMAC.String())
+			logger = logger.WithField("device", mac)
+			if !h.validMAC(mac) {
+				logger.Error("Unauthorized client")
+				continue
+			}
+			msgType := getDHCPMsgType(dhcpPacket.DHCP)
+			if msgType == layers.DHCPMsgTypeUnspecified {
+				logger.Error("Incoming packet is malformed: Unknown or missing message type")
+				continue
+			}
+
+			device, found := h.GetDevice(mac)
+			reply := layers.DHCPMsgTypeUnspecified
+			switch msgType {
+			case layers.DHCPMsgTypeDiscover:
 				if !found {
-					log.Errorf("Destination device not found: %s", dhcpPacket.Ethernet.SrcMAC.String())
+					deviceLogger := log.WithField("device", mac)
+					device = Device{
+						MacAddress: mac,
+						Unifi:      nil,
+						DHCP:       nil,
+						Log:        deviceLogger,
+					}
+				}
+				if device.DHCP == nil || device.DHCP.ClientIP == nil || time.Now().After(device.DHCP.Expiry) {
+					device.Log.Debug("DHCP handler: no DHCP informations")
+					freeNetwork, err := h.GetDHCPNetwork()
+					if err != nil {
+						device.Log.Printf("No free network")
+						continue
+					}
+					device.Log.Debugf("DHCP handler: asking for address creation: %s", freeNetwork.String())
+
+					h.ManageNet <- address.InterfaceAddress{
+						Network:   *freeNetwork,
+						Interface: h.Interface,
+					}
+					_, targetNetwork, err := net.ParseCIDR(freeNetwork.String())
+					if err != nil {
+						device.Log.Errorf("Cannot get server IP: %v", err)
+						continue
+					}
+					serverIP := network.NextIP(targetNetwork.IP, 1)
+					clientIP := network.NextIP(targetNetwork.IP, 2)
+					device.DHCP = &DHCPDevice{
+						ServerIP:    &serverIP,
+						NetworkMask: &freeNetwork.Mask,
+						ClientIP:    &clientIP,
+						Expiry:      time.Now().Add(h.DHCP.leaseDuration),
+					}
+				}
+				reply = layers.DHCPMsgTypeOffer
+				break
+			case layers.DHCPMsgTypeRequest:
+				if !found {
+					logger.Error("DHCP Request message from unknown device")
 					continue
 				}
+				if device.DHCP == nil || device.DHCP.ClientIP == nil {
+					logger.Error("DHCP Request message from unprepared device")
+					continue
+				}
+				reqIPOpt, err := getDHCPOption(dhcpPacket.DHCP.Options, layers.DHCPOptRequestIP)
+				var reqIP net.IP
+				if err != nil {
+					logger.Warn("Client hasn't requested an IP")
+					reqIP = dhcpPacket.DHCP.ClientIP
+				} else {
+					reqIP = net.IP(reqIPOpt.Data)
+				}
+				if len(reqIP) != 4 && reqIP.Equal(net.IPv4zero) {
+					logger.Errorf("Invalid requested IP: %s", reqIP.String())
+					continue
+				}
+				if !reqIP.Equal(*device.DHCP.ClientIP) {
+					logger.Errorf("Unknown requested IP: %s", reqIP.String())
+					continue
+				}
+				reply = layers.DHCPMsgTypeAck
+				break
+			case layers.DHCPMsgTypeDecline, layers.DHCPMsgTypeRelease:
+				logger.Warn("Client requested its deletion")
+				continue
+			default:
+				continue
+			}
+			if reply != layers.DHCPMsgTypeUnspecified {
+				dhcpReply := createDHCPReply(dhcpPacket.DHCP, msgType, &device, h.DHCP.leaseDuration)
 				var ip *layers.IPv4
 				if dhcpPacket.IP.SrcIP.Equal(net.IPv4zero) || dhcpPacket.IP.DstIP.Equal(net.IPv4bcast) {
 					ip = &layers.IPv4{
@@ -112,70 +195,84 @@ func Serve(in chan gopacket.Packet, out chan OutPacket, handler dhcp4.Handler) e
 					SrcPort: layers.UDPPort(67),
 					DstPort: layers.UDPPort(68),
 				}
-				//udp.Payload = res
 				if err := udp.SetNetworkLayerForChecksum(ip); err != nil {
-					log.Errorf("Cannot set network layer: %v", err)
+					logger.Errorf("Cannot set network layer: %v", err)
 					continue
 				}
 				eth := &layers.Ethernet{
-					SrcMAC:       conf.Iface.HardwareAddr,
+					SrcMAC:       h.Iface.HardwareAddr,
 					DstMAC:       dhcpPacket.Ethernet.SrcMAC,
 					EthernetType: layers.EthernetTypeIPv4,
 				}
-				dhcp := gopacket.NewPacket(
-					res,
-					layers.LayerTypeDHCPv4,
-					gopacket.Default,
-				)
-				var dhcpFound bool
 				buffer := gopacket.NewSerializeBuffer()
-				if dhcp != nil {
-					dhcpLayer := dhcp.Layer(layers.LayerTypeDHCPv4)
-					if dhcpLayer != nil {
-						if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcpLayer.(*layers.DHCPv4)); err != nil { //
-							log.Printf("Cannot serialize response: %v", err)
-							continue
-						}
-						dhcpFound = true
-					}
+				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcpReply); err != nil { //
+					logger.Printf("Cannot serialize response: %v", err)
+					continue
 				}
-				if !dhcpFound {
-					if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, gopacket.Payload(res)); err != nil { //
-						log.Printf("Cannot serialize response: %v", err)
-						continue
-					}
-				}
-
-				log.Debugf("Sending DHCP response %+v", eth)
-				log.Debugf("Sending DHCP response %+v", ip)
-				log.Debugf("Sending DHCP response %+v", udp)
-				log.Debugf("Packet layers: %+v", buffer.Layers())
-				content := buffer.Bytes()
-				pk := gopacket.NewPacket(
-					content,
-					layers.LayerTypeEthernet,
-					gopacket.Default,
-				)
-				log.Debugf("Packet %+v", pk.LinkLayer())
-				log.Debugf("Packet Net %+v", pk.NetworkLayer())
-				log.Debugf("Packet Transport %+v", pk.TransportLayer())
-				log.Debugf("Packet Application %+v", pk.ApplicationLayer())
-				dh := pk.Layer(layers.LayerTypeDHCPv4)
-				if dh == nil {
-					log.Debugf("Cannot decode DHCPv4 layer")
-				} else {
-					dhcp := dh.(*layers.DHCPv4)
-					log.Debugf("Packet Application %+v", dhcp)
-					if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcp); err == nil { //
-						log.Warn("Serialized in 2nd round")
-						out <- NewOutPacket(buffer.Bytes())
-						continue
-					}
-				}
-				out <- NewOutPacket(content)
-			} else {
-				log.Debug("DHCP response is empty or nil")
+				out <- NewOutPacket(buffer.Bytes())
+				h.AddDevice(device)
 			}
 		}
 	}
 }
+
+func createDHCPOptions(msgType layers.DHCPMsgType, device *Device, duration time.Duration) layers.DHCPOptions {
+	options := layers.DHCPOptions{}
+	options = append(options, layers.NewDHCPOption(layers.DHCPOptMessageType, []byte{byte(msgType)}))
+	options = append(options, layers.NewDHCPOption(layers.DHCPOptServerID, device.DHCP.ServerIP.To4()))
+	if duration > 0 {
+		leaseBytes := make([]byte, 4)
+		binary.BigEndian.PutUint32(leaseBytes, uint32(duration/time.Second))
+		options = append(options, layers.NewDHCPOption(layers.DHCPOptLeaseTime,leaseBytes))
+	}
+	options = append(options, layers.NewDHCPOption(layers.DHCPOptSubnetMask, *device.DHCP.NetworkMask))
+	options = append(options, layers.NewDHCPOption(layers.DHCPOptRouter, device.DHCP.ServerIP.To4()))
+	options = append(options, layers.NewDHCPOption(layers.DHCPOptDNS, device.DHCP.ServerIP.To4()))
+	return options
+}
+
+func getDHCPMsgType(dhcp *layers.DHCPv4) layers.DHCPMsgType {
+	option, err := getDHCPOption(dhcp.Options, layers.DHCPOptMessageType)
+	if err != nil {
+		return layers.DHCPMsgTypeUnspecified
+	}
+	if len(option.Data) != 1 {
+		return layers.DHCPMsgTypeUnspecified
+	}
+	msgType := layers.DHCPMsgType(option.Data[0])
+	if msgType < layers.DHCPMsgTypeDiscover ||  msgType > layers.DHCPMsgTypeInform {
+		return layers.DHCPMsgTypeUnspecified
+	}
+	return msgType
+}
+
+func getDHCPOption(options layers.DHCPOptions, optionType layers.DHCPOpt) (layers.DHCPOption, error) {
+	for _, option := range options {
+		if option.Type == optionType {
+			return option, nil
+		}
+	}
+	return layers.DHCPOption{}, nil
+}
+
+func createDHCPReply(request *layers.DHCPv4, msgType layers.DHCPMsgType, device *Device, duration time.Duration) *layers.DHCPv4 {
+	options := createDHCPOptions(msgType, device, duration)
+	return &layers.DHCPv4{
+		Operation:    layers.DHCPOpReply,
+		HardwareType: request.HardwareType,
+		HardwareLen:  request.HardwareLen,
+		HardwareOpts: request.HardwareOpts,
+		Xid:          request.Xid,
+		Secs:         request.Secs,
+		Flags:        request.Flags,
+		ClientIP:     request.ClientIP,
+		YourClientIP: device.DHCP.ClientIP.To4(),
+		NextServerIP: nil,
+		RelayAgentIP: nil,
+		ClientHWAddr: request.ClientHWAddr,
+		ServerName:   nil,
+		File:         nil,
+		Options:      options,
+	}
+}
+
