@@ -42,7 +42,7 @@ func New(cfg Config) (*base.Server, error) {
 			configuration.LogFileWriter = f
 			log.SetOutput(f)
 		} else {
-			logger.Errorf("Cannot open log file %s. Logging to stdout.", configuration.LogFile)
+			logger.Errorf("Cannot open log file %s. Logging to stderr.", configuration.LogFile)
 		}
 
 	} else {
@@ -129,7 +129,10 @@ func main() {
 	if len(args) == 1 && args[0] == "__ADDRESS_MGR__" {
 		address.Setup()
 	} else {
-
+		logger := log.WithFields(log.Fields{
+			"app": "riprovision",
+			"component": "main",
+		})
 		cfg := Config{}
 
 		configurator := &easyconfig.Configurator{
@@ -138,9 +141,9 @@ func main() {
 
 		err := easyconfig.Parse(configurator, &cfg)
 		if err != nil {
-			log.Fatalf("%v", err)
+			logger.Fatalf("%v", err)
 		}
-		log.Debugf("Started with %#v", cfg)
+		logger.Debugf("Started with %#v", cfg)
 		service.Main(&service.Info{
 			Name:      "riprovision",
 			AllowRoot: true,

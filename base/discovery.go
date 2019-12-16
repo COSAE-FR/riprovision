@@ -299,19 +299,22 @@ func (p *InformPacket) Device() *UnifiDevice {
 }
 
 func (server *Server) HandleInform(in chan gopacket.Packet) {
-	log.Debug("Starting Inform packet handler")
+	logger := server.Log.WithFields(log.Fields{
+		"component": "inform_handler",
+	})
+	logger.Debug("Starting Inform packet handler")
 	for {
 		select {
 		case packet := <-in:
-			log.Debugln("Received a new Inform packet")
+			logger.Debug("Received a new Inform packet")
 			ethLayer := packet.Layer(layers.LayerTypeEthernet)
 			if ethLayer == nil {
-				log.Error("Cannot parse Ethernet layer of packet")
+				logger.Error("Cannot parse Ethernet layer of packet")
 				continue
 			}
 			ethernet := ethLayer.(*layers.Ethernet)
 			mac := ethernet.SrcMAC.String()
-			logger := log.WithField("device", mac)
+			logger = logger.WithField("device", mac)
 			if !server.ValidMAC(mac) {
 				logger.Error("Unauthorized MAC address")
 				continue
@@ -325,36 +328,47 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 					continue
 				}
 				unifiDevice := inform.Device()
+				logger = logger.WithFields(log.Fields{
+					"device_model": unifiDevice.Model,
+					"device_platform": unifiDevice.Platform,
+				})
 				if unifiDevice.DeclaredMacAddress != mac {
 					logger.Errorf("Declared MAC differs from source MAC in packet: %s", unifiDevice.DeclaredMacAddress)
 					continue
 				}
 				device, found := server.GetDevice(mac)
+				deviceLogger := server.Log.WithFields(log.Fields{
+					"device": mac,
+					"device_model": unifiDevice.Model,
+					"device_platform": unifiDevice.Platform,
+				})
 				if !found {
 					if server.DHCP.Enable {
 						logger.Error("Unknown device: cannot accept new devices when DHCP is enabled")
 						continue
 					}
+
 					device = Device{
 						MacAddress: mac,
 						Unifi:      unifiDevice,
 						DHCP:       nil,
-						Log:        logger,
+						Log:        deviceLogger,
 					}
 				} else {
 					device.Unifi = unifiDevice
+					device.Log = deviceLogger
 				}
 				provision := server.NewProvisionDevice(&device)
 				device.Unifi.Provision = provision
-				device.Log.Debugf("Adding Device: \n%s", device.String())
+				logger.Debug("Adding Device")
 				server.AddDevice(device)
-				device.Log.Info("Launching provision")
+				logger.Info("Launching provision")
 				if err := device.Provision(); err != nil {
-					device.Log.Errorf("Error when provisioning device: %v", err)
+					logger.Errorf("Error when provisioning device: %v", err)
 				}
 
 			} else {
-				log.Debug("Cannot parse UDP layer of Inform packet")
+				logger.Debug("Cannot parse UDP layer of Inform packet")
 			}
 		}
 	}

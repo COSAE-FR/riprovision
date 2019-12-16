@@ -91,19 +91,20 @@ func (server *Server) LocalAddressCLeaner() {
 
 
 func (server *Server) RemoteAddressManager(address chan address.InterfaceAddress, exit chan int) {
-	log.Debugf("interface IP address manager started")
+	logger := server.Log.WithField("component", "address_manager")
+	logger.Debugf("interface IP address manager started")
 	for {
 		select {
 		case <-exit:
-			log.Info("interface IP address manager exit requested")
+			logger.Info("interface IP address manager exit requested")
 			return
 		case ipNetwork := <-address:
-			log.Debugf("NewHandler address to add: %s", ipNetwork.Network.String())
+			logger.Debugf("Received address to add: %s", ipNetwork.Network.String())
 			msg, err := server.NetManager.Manage(&ipNetwork)
 			if err != nil {
-				log.Errorf("Cannot manager server IP: %v (%s)", err, msg)
+				logger.Errorf("Cannot manager server IP: %v (%s)", err, msg)
 			} else {
-				log.Debugf("Server IP managed: %s", msg)
+				logger.Debugf("Interface address set/unset: %s", msg)
 			}
 			continue
 		}

@@ -56,7 +56,7 @@ type Server struct {
 	Log *log.Entry
 
 	MaxDevices int `yaml:"max_devices"`
-	MACPrefix  []string
+	MACPrefix  []string `yaml:"mac_prefixes"`
 
 	Provision provisionConfiguration `yaml:"provision"`
 	DHCP      dhcpConfiguration      `yaml:"dhcp"`
@@ -91,22 +91,26 @@ func NewOutPacket(data []byte) OutPacket {
 }
 
 func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
-	log.Debugf("Write goroutine started")
+	logger := log.WithFields(log.Fields{
+		"app": "riprovision",
+		"component": "packet_writer",
+	})
+	logger.Debugf("Packet writer started")
 	for {
 		select {
 		case <-exit:
 			return
 		case pckt := <-out:
 			if len(pckt.data) != pckt.len {
-				log.Errorf("WritePacket: error lengths differ: announced %d vs computed %d", pckt.len, len(pckt.data))
+				logger.Errorf("Lengths differ: announced %d vs computed %d", pckt.len, len(pckt.data))
 				continue
 			}
-			log.Debugf("NewHandler packet to write in write goroutine %d", pckt.len)
+			logger.Debugf("New packet to write: %d", pckt.len)
 			err := handler.Write(pckt.data)
 			if err != nil {
-				log.Errorf("Write packet: error while writing: %+v", err)
+				logger.Errorf("Write packet: error while writing: %+v", err)
 			} else {
-				log.Debugf("Write Packet: successful write")
+				logger.Debugf("Successful write")
 			}
 			continue
 
@@ -272,7 +276,7 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 			c.DHCP.NetworkPrefix = 27
 		}
 		if c.DHCP.LeaseMinutes == 0 {
-			c.DHCP.LeaseMinutes = 15
+			c.DHCP.LeaseMinutes = 10
 		}
 		c.DHCP.LeaseDuration = time.Duration(c.DHCP.LeaseMinutes) * time.Minute
 	}

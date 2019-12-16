@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	pssh "github.com/gcrahay/riprovision/ssh"
-	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
@@ -33,30 +32,31 @@ func (d *Device) setBusy(msg string) error {
 }
 
 func (device *Device) generateConfiguration() (conf string, err error) {
+	logger := device.Log.WithField("component", "device_configuration")
 	if !device.IsReady() {
 		return "", errors.New("device is not ready")
 	}
 	var buf bytes.Buffer
 	modelTmpl, found := device.Unifi.Provision.Configuration.Models[device.Unifi.Model]
 	if !found {
-		device.Log.Errorf("Cannot find configurator template name for device model: %s", device.Unifi.Model)
+		logger.Errorf("Cannot find configurator template name for device model: %s", device.Unifi.Model)
 		err = errors.New("cannot find configurator template name for device")
 		return
 	}
 	tmplString, found := device.Unifi.Provision.Configuration.Templates[modelTmpl]
 	if found == false {
-		device.Log.Errorf("Cannot find configurator template for device model: %s", device.Unifi.Model)
+		logger.Errorf("Cannot find configurator template for device model: %s", device.Unifi.Model)
 		err = errors.New("cannot find configurator template for device")
 		return
 	}
 	tmpl, err := template.New("device_configuration").Parse(tmplString)
 	if err != nil {
-		device.Log.Errorf("Cannot parse configurator template for device model: %s, %v", device.Unifi.Model, err)
+		logger.Errorf("Cannot parse configurator template for device model: %s, %v", device.Unifi.Model, err)
 		return
 	}
 	err = tmpl.Execute(&buf, device)
 	if err != nil {
-		device.Log.Errorf("Cannot execute configurator template for device model: %s, %v", device.Unifi.Model, err)
+		logger.Errorf("Cannot execute configurator template for device model: %s, %v", device.Unifi.Model, err)
 		return
 	}
 	conf = buf.String()
@@ -88,12 +88,13 @@ func (d *Device) Provision() error {
 
 // runs in background-goroutine
 func (d *Device) doProvision(c *ssh.Client) {
-	d.Log.Debug("Start provisioning...")
+	logger := d.Log.WithField("component", "device_provision")
+	logger.Debug("Start provisioning...")
 	var sessionError error
 
 	tmpfile, err := ioutil.TempFile("", "device_configuration")
 	if err != nil {
-		d.Log.Errorf("Cannot create temporary configurator file: %v", err)
+		logger.Errorf("Cannot create temporary configurator file: %v", err)
 		return
 	}
 
@@ -101,60 +102,60 @@ func (d *Device) doProvision(c *ssh.Client) {
 
 	configurationString, err := d.generateConfiguration()
 	if err != nil {
-		d.Log.Errorf("Cannot generate configurator: %v", err)
+		logger.Errorf("Cannot generate configurator: %v", err)
 		return
 	}
-	log.Tracef("Configuration to upload:\n %s", configurationString)
 
 	content := []byte(configurationString)
 
 	if _, err := tmpfile.Write(content); err != nil {
-		d.Log.Errorf("Cannot write temporary configurator file: %v", err)
+		logger.Errorf("Cannot write temporary configurator file: %v", err)
 		return
 	}
 	if err := tmpfile.Close(); err != nil {
-		d.Log.Errorf("Cannot close temporary configurator file: %v", err)
+		logger.Errorf("Cannot close temporary configurator file: %v", err)
 		return
 	}
 
 	remotePath := "/tmp/system.cfg"
-	var output string
 	if sessionError = pssh.UploadFile(c, tmpfile.Name(), remotePath); sessionError != nil {
-		d.Log.Errorf("Upload failed: %v", sessionError)
+		logger.Errorf("Upload failed: %v", sessionError)
 		return
 	}
-	d.Log.Debugf("local(%s) -> remote(%s) 100%%", tmpfile.Name(), remotePath)
+	logger.Debugf("local(%s) -> remote(%s) 100%%", tmpfile.Name(), remotePath)
 
-	output, sessionError = pssh.ExecuteCommand(c, "/usr/bin/cfgmtd -w -p /etc/")
+	_, sessionError = pssh.ExecuteCommand(c, "/usr/bin/cfgmtd -w -p /etc/")
 	if sessionError != nil {
-		d.Log.Errorf("Could not save configurator: %v", sessionError)
+		logger.Errorf("Could not save configurator: %v", sessionError)
 		return
 	}
-	d.Log.Infof("Configuration saved: %s", output)
+	logger.Info("Configuration saved")
 
-	output, sessionError = pssh.ExecuteCommand(c, "/usr/bin/reboot")
+	_, sessionError = pssh.ExecuteCommand(c, "/usr/bin/reboot")
 	if sessionError != nil {
-		d.Log.Errorf("Reboot failed: %v", sessionError)
+		logger.Errorf("Reboot failed: %v", sessionError)
 		return
 	}
 	d.markReboot(5 * time.Second)
-	d.Log.Infof("Reboot succeeded: %s", output)
+	logger.Infof("Reboot succeeded")
 }
 
 // Reboot issues a reboot on the device.
 func (d *Device) Reboot() error {
+	logger := d.Log.WithField("component", "device_reboot")
 	return d.withSSHClient("rebooting", func(c *ssh.Client) {
 		out, sessionError := pssh.ExecuteCommand(c, "/usr/bin/reboot")
 		if sessionError != nil {
-			d.Log.Errorf("Reboot failed: %v", sessionError)
+			logger.Errorf("Reboot failed: %v", sessionError)
 			return
 		}
 		d.markReboot(5 * time.Second)
-		d.Log.Infof("Reboot succeeded: %s", out)
+		logger.Infof("Reboot succeeded: %s", out)
 	})
 }
 
 func (d *Device) withSSHClient(msg string, callback func(*ssh.Client)) error {
+	logger := d.Log.WithField("component", "device_ssh")
 	var client *ssh.Client
 	if err := d.setBusy(msg); err != nil {
 		return err
@@ -165,19 +166,19 @@ func (d *Device) withSSHClient(msg string, callback func(*ssh.Client)) error {
 		if client != nil {
 			break
 		}
-		d.Log.Errorf("Could not obtain SSH client for user %s", user)
+		logger.Errorf("Could not obtain SSH client for user %s", user)
 	}
 
 	if client == nil {
 		d.busy = false
-		return fmt.Errorf("Could not obtain SSH client")
+		return fmt.Errorf("could not obtain SSH client")
 	}
 
-	d.Log.Debug("Got a client")
+	logger.Debug("Got a client")
 
 	go func() {
 		callback(client)
-		d.Log.Info("Callback succeeded")
+		logger.Info("Callback succeeded")
 		d.busy = false
 		client.Close()
 	}()

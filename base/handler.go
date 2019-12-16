@@ -30,7 +30,7 @@ func NewHandler(iface *net.Interface) (*PacketHandler, error) {
 		iface: iface,
 		log: log.WithFields(log.Fields{
 			"app": "riprovision",
-			"component": "capture",
+			"component": "packet_capture",
 		}),
 	}
 	handle, err := pcap.OpenLive(iface.Name, 65536, true, pcap.BlockForever)
@@ -83,7 +83,7 @@ func (handler *PacketHandler) Listen(stop chan int) {
 					}
 					handler.log.Errorf("Cannot extract IP layer")
 				} else if udp.DstPort == DHCPPort {
-					handler.log.Debug("NewHandler packet is DHCP")
+					handler.log.Debug("New packet is DHCP")
 					handler.DHCP <- packet
 				}
 			}
@@ -92,6 +92,5 @@ func (handler *PacketHandler) Listen(stop chan int) {
 }
 
 func (handler *PacketHandler) Write(packet []byte) error {
-	log.Debugf("Sending packet on wire, len %d", len(packet))
 	return handler.handle.WritePacketData(packet)
 }

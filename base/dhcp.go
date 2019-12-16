@@ -71,16 +71,17 @@ func (h *Server)DHCPServer() {
 				continue
 			}
 			mac := dhcpPacket.Ethernet.SrcMAC.String()
+			logger = logger.WithField("device", mac)
 			if dhcpPacket.DHCP.ClientHWAddr.String() != mac {
 				logger.Errorf("MAC address mismatch between Ethernet and DHCP packets")
 				continue
 			}
-			logger = logger.WithField("device", mac)
 			if !h.ValidMAC(mac) {
 				logger.Error("Unauthorized client")
 				continue
 			}
 			msgType := getDHCPMsgType(dhcpPacket.DHCP)
+			logger = logger.WithField("dhcp_msg", msgType.String())
 			if msgType == layers.DHCPMsgTypeUnspecified {
 				logger.Error("Incoming packet is malformed: Unknown or missing message type")
 				continue
@@ -103,10 +104,10 @@ func (h *Server)DHCPServer() {
 					device.Log.Debug("DHCP handler: no DHCP informations")
 					freeNetwork, err := h.GetDHCPNetwork()
 					if err != nil {
-						device.Log.Printf("No free network")
+						logger.Error("No free network")
 						continue
 					}
-					device.Log.Debugf("DHCP handler: asking for address creation: %s", freeNetwork.String())
+					logger.Debugf("DHCP handler: asking for address creation: %s", freeNetwork.String())
 
 					h.ManageNet <- address.InterfaceAddress{
 						Network:   *freeNetwork,
@@ -114,7 +115,7 @@ func (h *Server)DHCPServer() {
 					}
 					_, targetNetwork, err := net.ParseCIDR(freeNetwork.String())
 					if err != nil {
-						device.Log.Errorf("Cannot get server IP: %v", err)
+						logger.Errorf("Cannot compute server IP: %v", err)
 						continue
 					}
 					serverIP := network.NextIP(targetNetwork.IP, 1)
@@ -206,7 +207,7 @@ func (h *Server)DHCPServer() {
 				}
 				buffer := gopacket.NewSerializeBuffer()
 				if err := gopacket.SerializeLayers(buffer, packetOptions, eth, ip, udp, dhcpReply); err != nil { //
-					logger.Printf("Cannot serialize response: %v", err)
+					logger.Errorf("Cannot serialize response: %v", err)
 					continue
 				}
 				h.WriteNet <- NewOutPacket(buffer.Bytes())

@@ -22,17 +22,22 @@ func (h *Server) validPrefix(mac string) bool {
 
 func (h *Server) ValidMAC(mac string) bool {
 	mac = strings.ToLower(mac)
+	logger := h.Log.WithFields(log.Fields{
+		"device": mac,
+		"component": "mac_validator",
+	})
 	if !h.validPrefix(mac) {
-		log.Warnf("[Client %s] Invalid prefix", mac)
+		logger.Error("Invalid prefix")
+		return false
 	}
 	macEntries := arp.ReverseSearch(mac)
 	for _, macEntry := range macEntries {
 		if macEntry.Permanent != true {
-			log.Warnf("[Client %s] Non permanent MAC entry, searching: %+v", mac, macEntry)
+			logger.Infof("Non permanent MAC entry on interface: %s", macEntry.Iface)
 			continue
 		}
 		if !stringInSlice(macEntry.Iface, h.Provision.InterfaceNames) {
-			log.Warnf("[Client %s] Not a client interface, searching: %+v", mac, macEntry)
+			logger.Infof("Not a provisioning interface: %s", macEntry.Iface)
 			continue
 		}
 		netInterface, err := net.InterfaceByName(macEntry.Iface)
@@ -46,16 +51,16 @@ func (h *Server) ValidMAC(mac string) bool {
 							break
 						}
 					default:
-						log.Debugf("[Client %s] Cannot guess interface address, searching: %+v", mac, macEntry)
+						logger.Infof("Cannot guess interface address on interface: %s", macEntry.Iface)
 						continue
 					}
 				}
 			} else {
-				log.Debugf("[Client %s] Cannot find interface addresses, searching: %+v", mac, macEntry)
+				logger.Infof("Cannot find addresses for interfaces: %s", macEntry.Iface)
 				continue
 			}
 		} else {
-			log.Debugf("[Client %s] Cannot find interface on server, searching: %+v", mac, macEntry)
+			logger.Infof("Cannot find interface %s on server", macEntry.Iface)
 			continue
 		}
 		return true

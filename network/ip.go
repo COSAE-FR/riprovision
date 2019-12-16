@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/apparentlymart/go-cidr/cidr"
-	log "github.com/sirupsen/logrus"
 	"net"
 )
 
@@ -64,13 +63,10 @@ func GetFreeNetworkBlacklist(base *net.IPNet, prefixLen int, bl []net.IPNet) (*n
 	mask := net.CIDRMask(prefixLen, 32)
 	candidate := &net.IPNet{IP: base.IP, Mask: mask}
 	for {
-		log.Debugf("Testing network %s", candidate.String())
 		if !NetworkOverlap(base, candidate) {
-			log.Debugf("No available network in range")
 			return nil, errors.New("no available network in range")
 		}
 		if !NetworkOverlapsLocalNetwork(candidate) && !NetworkOverlapsBlacklist(candidate, bl) {
-			log.Debugf("Candidate %s found!", candidate.String())
 			return candidate, nil
 		}
 		candidate = &net.IPNet{IP: NextIP(candidate.IP, cidr.AddressCount(candidate)+2), Mask: mask}

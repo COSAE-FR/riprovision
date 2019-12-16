@@ -23,44 +23,52 @@ type sshSessionCallback func(*ssh.Session) error
 
 // Agent tries to connect with the ssh-agent
 func Agent() ssh.AuthMethod {
+	logger := log.WithFields(log.Fields{
+		"app": "riprovision",
+		"component": "ssh_agent",
+	})
 	sock := os.Getenv("SSH_AUTH_SOCK")
 	if sock == "" {
-		log.Printf("[ssh.Agent] SSH_AUTH_SOCK is not defined or empty")
+		logger.Warn("SSH_AUTH_SOCK is not defined or empty")
 		return nil
 	}
 
 	sshAgent, err := net.Dial("unix", os.Getenv("SSH_AUTH_SOCK"))
 	if err == nil {
-		log.Printf("[ssh.Agent] Couldn't connect to SSH agent: %v", err)
+		logger.Warnf("Couldn't connect to SSH agent: %v", err)
 		return nil
 	}
 
-	agent := agent.NewClient(sshAgent)
-	keys, err := agent.List()
+	localAgent := agent.NewClient(sshAgent)
+	keys, err := localAgent.List()
 	if err != nil {
-		log.Printf("[ssh.Agent] Listing keys error'ed: %v", err)
+		logger.Warnf("Listing keys error'ed: %v", err)
 	} else {
-		log.Printf("Keys: %v", keys)
+		logger.Debugf("Keys: %v", keys)
 	}
-	return ssh.PublicKeysCallback(agent.Signers)
+	return ssh.PublicKeysCallback(localAgent.Signers)
 }
 
 // ReadPrivateKey tries to read an SSH private key file.
 func ReadPrivateKey(keyPath, password string) (auth ssh.AuthMethod, ok bool) {
+	logger := log.WithFields(log.Fields{
+		"app": "riprovision",
+		"component": "ssh_keyfile",
+	})
 	keyFile, err := goldflags.ExpandPath(keyPath)
 	if err != nil {
-		log.Printf("[ssh.ReadPrivateKey] Could not expand %s: %v", keyPath, err)
+		logger.Warnf("Could not expand %s: %v", keyPath, err)
 		return
 	}
 
 	if !goldflags.PathExist(keyFile) {
-		log.Printf("[ssh.ReadPrivateKey] Keyfile %s not found", keyFile)
+		logger.Warnf(" Keyfile %s not found", keyFile)
 		return
 	}
 
 	keyPEM, err := ioutil.ReadFile(keyFile)
 	if err != nil {
-		log.Printf("[ssh.ReadPrivateKey] Could not read %s: %v", keyFile, err)
+		logger.Warnf("Could not read %s: %v", keyFile, err)
 		return
 	}
 
@@ -74,20 +82,20 @@ func ReadPrivateKey(keyPath, password string) (auth ssh.AuthMethod, ok bool) {
 	if strings.Contains(block.Headers["Proc-Type"], "ENCRYPTED") {
 		keyFrom, err = x509.DecryptPEMBlock(block, []byte(password))
 		if err != nil {
-			log.Printf("[ssh.ReadPrivateKey] Error decrypting %s: %v", keyFile, err)
+			logger.Warnf("Error decrypting %s: %v", keyFile, err)
 			return
 		}
 	}
 
 	key, err := getKey(block.Type, keyFrom)
 	if err != nil {
-		log.Printf("[ssh.ReadPrivateKey] %s: %v", keyFile, err)
+		logger.Warnf("Cannot get key %s: %v", keyFile, err)
 		return
 	}
 
 	sign, err := ssh.NewSignerFromKey(key)
 	if err != nil {
-		log.Printf("[ssh.ReadPrivateKey] %s: %v", keyFile, err)
+		logger.Warnf("Cannot get signer %s: %v", keyFile, err)
 		return
 	}
 	return ssh.PublicKeys(sign), true
@@ -120,6 +128,12 @@ func WithinSession(client *ssh.Client, callback sshSessionCallback) error {
 // UploadFile uploads a local file to the remote. Please avoid funky
 // remote file names, since there's no protection against command injection
 func UploadFile(client *ssh.Client, localName string, remoteName string) error {
+	logger := log.WithFields(log.Fields{
+		"app": "riprovision",
+		"component": "ssh_upload",
+		"src_file": localName,
+		"dest_file": remoteName,
+	})
 	return WithinSession(client, func(s *ssh.Session) error {
 		writer, err := s.StdinPipe()
 		if err != nil {
@@ -131,27 +145,27 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 		if err != nil {
 			return err
 		}
-		log.Printf("[ssh.UploadFile local-file] %s, %d bytes", localName, len(buf))
+		logger.Debugf("Local-file: %s, %d bytes", localName, len(buf))
 
 		rdir := filepath.Dir(remoteName)
-		log.Printf("[ssh.UploadFile remote-dir] %s", rdir)
+		logger.Debugf("Remote-dir: %s", rdir)
 
 		rfile := filepath.Base(remoteName)
-		log.Printf("[ssh.UploadFile remote-file] %s", rfile)
+		logger.Debugf("Remote-file]: %s", rfile)
 
 		var so, se bytes.Buffer
 		s.Stdout = &so
 		s.Stderr = &se
 
 		cmd := fmt.Sprintf("/usr/bin/scp -t %s", rdir) // danger!
-		log.Printf("[ssh.UploadFile command] %s", cmd)
+		logger.Debugf("Command: %s", cmd)
 
 		if err := s.Start(cmd); err != nil {
 			return err
 		}
 
 		content := string(buf)
-		log.Printf("[ssh.UploadFile uploading] %d bytes", len(content))
+		logger.Debugf("Uploading: %d bytes", len(content))
 
 		// https://blogs.oracle.com/janp/entry/how_the_scp_protocol_works
 		fmt.Fprintln(writer, "C0644", len(content), rfile)
@@ -160,9 +174,8 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 		writer.Close()
 
 		if err := s.Wait(); err != nil {
-			log.Println("[ssh.UploadFile] waiting failed")
-			log.Printf("[ssh.UploadFile stderr] %s", se.String())
-			log.Printf("[ssh.UploadFile stdout] %s", so.String())
+			logger.Errorf("Waiting failed: %v", err)
+			logger.Debugf("Stdout: %s, stdOut: %s", se.String(), so.String())
 			return err
 		}
 
@@ -172,6 +185,11 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 
 // ExecuteCommand executes a command in a new SSH session.
 func ExecuteCommand(client *ssh.Client, cmd string) (string, error) {
+	logger := log.WithFields(log.Fields{
+		"app": "riprovision",
+		"component": "ssh_command",
+		"command": cmd,
+	})
 	var output string
 	sessionErr := WithinSession(client, func(s *ssh.Session) error {
 		var so, se bytes.Buffer
@@ -179,9 +197,8 @@ func ExecuteCommand(client *ssh.Client, cmd string) (string, error) {
 		s.Stderr = &se
 
 		if err := s.Run(cmd); err != nil {
-			log.Printf("[executeCommand] %s failed", cmd)
-			log.Printf("[executeCommand stderr] %s", se.String())
-			log.Printf("[executeCommand stdout] %s", so.String())
+			logger.Errorf("Command failed: %v", err)
+			logger.Debugf("Stdout: %s, stdOut: %s", se.String(), so.String())
 			return err
 		}
 
