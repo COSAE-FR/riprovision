@@ -162,7 +162,7 @@ func (h *Server) DHCPServer(in chan gopacket.Packet, out chan OutPacket) {
 				continue
 			}
 			if reply != layers.DHCPMsgTypeUnspecified {
-				dhcpReply := createDHCPReply(dhcpPacket.DHCP, msgType, &device, h.DHCP.leaseDuration)
+				dhcpReply := createDHCPReply(dhcpPacket.DHCP, reply, &device, h.DHCP.leaseDuration)
 				var ip *layers.IPv4
 				if dhcpPacket.IP.SrcIP.Equal(net.IPv4zero) || dhcpPacket.IP.DstIP.Equal(net.IPv4bcast) {
 					ip = &layers.IPv4{
