@@ -32,7 +32,7 @@ func LocalAddressManager(addressChan chan address.InterfaceAddress, exit chan in
 			log.Info("interface IP address manager exit requested")
 			return
 		case ipNetwork := <-addressChan:
-			log.Debugf("NewHandler address to add: %s", ipNetwork.Network.String())
+			log.Debugf("Handler address to add: %s", ipNetwork.Network.String())
 			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network.String())
 			if err != nil {
 				log.Errorf("Cannot get server IP: %+v", err)
