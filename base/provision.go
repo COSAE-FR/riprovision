@@ -9,9 +9,12 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
+	"strings"
 	"text/template"
 	"time"
 )
+
+const defaultConfigurationBin = "/usr/bin/cfgmtd"
 
 // IsBusy states whether or not this Device is ready to receive commands.
 func (d *Device) IsBusy() bool {
@@ -124,9 +127,31 @@ func (d *Device) doProvision(c *ssh.Client) {
 	}
 	logger.Debugf("local(%s) -> remote(%s) 100%%", tmpfile.Name(), remotePath)
 
-	_, sessionError = pssh.ExecuteCommand(c, "/usr/bin/cfgmtd -w -p /etc/")
+	var paths string
+	paths, sessionError = pssh.ExecuteCommand(c, "find / -name cfgmtd")
 	if sessionError != nil {
-		logger.Errorf("Could not save configurator: %v", sessionError)
+		logger.Errorf("Could not find cfgmtd binary: %v, trying default path %s", sessionError, defaultConfigurationBin)
+	}
+
+	if len(paths) == 0 {
+		paths = defaultConfigurationBin
+	}
+
+	configured := false
+	for _, binary := range strings.Split(paths, "\n") {
+		command := fmt.Sprintf("%s -w -p /etc/", binary)
+		logger.Infof("Trying to save configuration with: %s", command)
+		_, sessionError = pssh.ExecuteCommand(c, command)
+		if sessionError != nil {
+			logger.Errorf("Could not save configuration: %v", sessionError)
+			continue
+		}
+		configured = true
+		break
+	}
+
+	if !configured {
+		logger.Error("Could not save configuration: no working cfgmtd binary")
 		return
 	}
 	logger.Info("Configuration saved")
@@ -180,7 +205,7 @@ func (d *Device) withSSHClient(msg string, callback func(*ssh.Client)) error {
 		callback(client)
 		logger.Info("Callback succeeded")
 		d.busy = false
-		client.Close()
+		_ = client.Close()
 	}()
 
 	return nil
