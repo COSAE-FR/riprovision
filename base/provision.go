@@ -135,6 +135,8 @@ func (d *Device) doProvision(c *ssh.Client) {
 
 	if len(paths) == 0 {
 		paths = defaultConfigurationBin
+	} else {
+		logger.Debugf("Found cfgmtd paths: %s", paths)
 	}
 
 	configured := false

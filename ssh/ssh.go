@@ -24,7 +24,7 @@ type sshSessionCallback func(*ssh.Session) error
 // Agent tries to connect with the ssh-agent
 func Agent() ssh.AuthMethod {
 	logger := log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":       "riprovision",
 		"component": "ssh_agent",
 	})
 	sock := os.Getenv("SSH_AUTH_SOCK")
@@ -52,7 +52,7 @@ func Agent() ssh.AuthMethod {
 // ReadPrivateKey tries to read an SSH private key file.
 func ReadPrivateKey(keyPath, password string) (auth ssh.AuthMethod, ok bool) {
 	logger := log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":       "riprovision",
 		"component": "ssh_keyfile",
 	})
 	keyFile, err := goldflags.ExpandPath(keyPath)
@@ -129,9 +129,9 @@ func WithinSession(client *ssh.Client, callback sshSessionCallback) error {
 // remote file names, since there's no protection against command injection
 func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 	logger := log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":       "riprovision",
 		"component": "ssh_upload",
-		"src_file": localName,
+		"src_file":  localName,
 		"dest_file": remoteName,
 	})
 	return WithinSession(client, func(s *ssh.Session) error {
@@ -186,9 +186,9 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 // ExecuteCommand executes a command in a new SSH session.
 func ExecuteCommand(client *ssh.Client, cmd string) (string, error) {
 	logger := log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":       "riprovision",
 		"component": "ssh_command",
-		"command": cmd,
+		"command":   cmd,
 	})
 	var output string
 	sessionErr := WithinSession(client, func(s *ssh.Session) error {
@@ -202,7 +202,7 @@ func ExecuteCommand(client *ssh.Client, cmd string) (string, error) {
 			return err
 		}
 
-		output = se.String()
+		output = so.String()
 		return nil
 	})
 
