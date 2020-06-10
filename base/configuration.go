@@ -50,12 +50,12 @@ type Server struct {
 	Interface string `yaml:"interface"`
 	Iface     *net.Interface
 
-	LogLevel string `yaml:"log_level"`
-	LogFile  string `yaml:"log_file"`
+	LogLevel      string `yaml:"log_level"`
+	LogFile       string `yaml:"log_file"`
 	LogFileWriter *os.File
-	Log *log.Entry
+	Log           *log.Entry
 
-	MaxDevices int `yaml:"max_devices"`
+	MaxDevices int      `yaml:"max_devices"`
 	MACPrefix  []string `yaml:"mac_prefixes"`
 
 	Provision provisionConfiguration `yaml:"provision"`
@@ -64,15 +64,15 @@ type Server struct {
 	Handler *PacketHandler
 
 	NetManager address.Manager // RPC client to talk to the interface address manager
-	ManageNet chan address.InterfaceAddress
-	StopNet   chan int
+	ManageNet  chan address.InterfaceAddress
+	StopNet    chan int
 
 	WriteNet  chan OutPacket
 	StopWrite chan int
 
 	StopListen chan int
 
-	StopClean chan int
+	StopClean   chan int
 	CleanTicker *time.Ticker
 
 	Cache *lru.Cache
@@ -92,7 +92,7 @@ func NewOutPacket(data []byte) OutPacket {
 
 func WritePacket(out chan OutPacket, exit chan int, handler *PacketHandler) {
 	logger := log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":       "riprovision",
 		"component": "packet_writer",
 	})
 	logger.Debugf("Packet writer started")
@@ -153,8 +153,8 @@ func (server *Server) Stop() error {
 			if found {
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
 					server.ManageNet <- address.InterfaceAddress{
-						Network:   net.IPNet{
-							IP: *device.DHCP.ServerIP,
+						Network: net.IPNet{
+							IP:   *device.DHCP.ServerIP,
 							Mask: *device.DHCP.NetworkMask,
 						},
 						Interface: server.Interface,
@@ -200,7 +200,7 @@ func (server *Server) HasDevice(mac string) bool {
 // LoadConfig reads a YAML file and converts it to a Server object
 func LoadConfig(fileName string) (c *Server, errs []error) {
 	logger := log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":       "riprovision",
 		"component": "config_loader",
 	})
 	c = &Server{}
@@ -215,14 +215,19 @@ func LoadConfig(fileName string) (c *Server, errs []error) {
 		return
 	}
 
+	if len(c.LogLevel) == 0 {
+		c.LogLevel = "error"
+	}
+	logLevel, err := log.ParseLevel(c.LogLevel)
+	if err != nil {
+		logLevel = log.ErrorLevel
+	}
+	log.SetLevel(logLevel)
+
 	// the following errors are recoverable
 
 	if len(c.Interface) == 0 {
 		errs = append(errs, fmt.Errorf("missing option interfaces, at least one name (or '*') must be given"))
-	}
-
-	if len(c.LogLevel) == 0 {
-		c.LogLevel = "error"
 	}
 
 	c.Iface, err = net.InterfaceByName(c.Interface)
