@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	pssh "github.com/gcrahay/riprovision/ssh"
+	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"
 	"os"
@@ -100,6 +101,42 @@ func getBinaryPaths(c *ssh.Client, name string) (error, []string) {
 	return nil, strings.Split(paths, "\n")
 }
 
+func runCommand(c *ssh.Client, logger *logrus.Entry, name string, defaultName string, line string) error {
+	err, paths := getBinaryPaths(c, name)
+	if err != nil {
+		if len(defaultName) > 0 {
+			logger.Errorf("Could not find %s binary: %v, trying default path %s", name, err, defaultName)
+		} else {
+			return fmt.Errorf("cannot find binary %s", name)
+		}
+
+	}
+	if paths == nil || len(paths) == 0 {
+		paths = []string{defaultName}
+	}
+
+	configured := false
+	for _, binary := range paths {
+		command := binary
+		if len(line) > 0 {
+			command = fmt.Sprintf(line, binary)
+		}
+		logger.Infof("Trying to run: %s", command)
+		_, sessionError := pssh.ExecuteCommand(c, command)
+		if sessionError != nil {
+			logger.Errorf("Could not run %s: %v", command, sessionError)
+			continue
+		}
+		configured = true
+		break
+	}
+
+	if !configured {
+		return fmt.Errorf("no working %s binary", name)
+	}
+	return nil
+}
+
 // runs in background-goroutine
 func (d *Device) doProvision(c *ssh.Client) {
 	logger := d.Log.WithField("component", "device_provision")
@@ -138,60 +175,29 @@ func (d *Device) doProvision(c *ssh.Client) {
 	}
 	logger.Debugf("local(%s) -> remote(%s) 100%%", tmpfile.Name(), remotePath)
 
-	err, paths := getBinaryPaths(c, "cfgmtd")
+	err = runCommand(c, logger, "cfgmtd", defaultConfigurationBin, "%s -w -p /etc/")
 	if err != nil {
 		logger.Errorf("Could not find cfgmtd binary: %v, trying default path %s", err, defaultConfigurationBin)
-	}
-	if paths == nil || len(paths) == 0 {
-		paths = []string{defaultConfigurationBin}
-	}
-
-	configured := false
-	for _, binary := range paths {
-		command := fmt.Sprintf("%s -w -p /etc/", binary)
-		logger.Infof("Trying to save configuration with: %s", command)
-		_, sessionError = pssh.ExecuteCommand(c, command)
-		if sessionError != nil {
-			logger.Errorf("Could not save configuration: %v", sessionError)
-			continue
-		}
-		configured = true
-		break
-	}
-
-	if !configured {
-		logger.Error("Could not save configuration: no working cfgmtd binary")
 		return
 	}
+
 	logger.Info("Configuration saved")
 
-	_ = d.Reboot()
+	err = runCommand(c, logger, "reboot", defaultRebootBin, "")
+	if err != nil {
+		d.markReboot(5 * time.Second)
+		logger.Info("Reboot succeeded")
+	} else {
+		logger.Errorf("Cannot reboot: %v", err)
+	}
 }
 
 // Reboot issues a reboot on the device.
 func (d *Device) Reboot() error {
 	logger := d.Log.WithField("component", "device_reboot")
 	return d.withSSHClient("rebooting", func(c *ssh.Client) {
-		err, paths := getBinaryPaths(c, "reboot")
-		if err != nil {
-			logger.Errorf("Could not find reboot binary: %v, trying default path %s", err, defaultRebootBin)
-		}
-		if paths == nil || len(paths) == 0 {
-			paths = []string{defaultRebootBin}
-		}
-
-		rebooted := false
-		for _, binary := range paths {
-			logger.Infof("Trying to reboot device with: %s", binary)
-			_, sessionError := pssh.ExecuteCommand(c, binary)
-			if sessionError != nil {
-				logger.Errorf("Reboot failed: %v", sessionError)
-				continue
-			}
-			rebooted = true
-			break
-		}
-		if rebooted {
+		err := runCommand(c, logger, "reboot", defaultRebootBin, "")
+		if err == nil {
 			d.markReboot(5 * time.Second)
 			logger.Info("Reboot succeeded")
 		} else {
