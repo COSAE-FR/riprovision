@@ -103,6 +103,8 @@ func ReadPrivateKey(keyPath, password string) (auth ssh.AuthMethod, ok bool) {
 
 func getKey(typ string, b []byte) (interface{}, error) {
 	switch typ {
+	case "PRIVATE KEY":
+		return x509.ParsePKCS8PrivateKey(b)
 	case "RSA PRIVATE KEY":
 		return x509.ParsePKCS1PrivateKey(b)
 	case "EC PRIVATE KEY":
