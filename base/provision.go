@@ -184,7 +184,7 @@ func (d *Device) doProvision(c *ssh.Client) {
 	logger.Info("Configuration saved")
 
 	err = runCommand(c, logger, "reboot", defaultRebootBin, "")
-	if err != nil {
+	if err == nil {
 		d.markReboot(5 * time.Second)
 		logger.Info("Reboot succeeded")
 	} else {
