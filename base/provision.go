@@ -15,6 +15,7 @@ import (
 )
 
 const defaultConfigurationBin = "/usr/bin/cfgmtd"
+const defaultRebootBin = "/usr/bin/reboot"
 
 // IsBusy states whether or not this Device is ready to receive commands.
 func (d *Device) IsBusy() bool {
@@ -89,6 +90,16 @@ func (d *Device) Provision() error {
 	return d.withSSHClient("provisioning", d.doProvision)
 }
 
+func getBinaryPaths(c *ssh.Client, name string) (error, []string) {
+	var paths string
+	findCommand := fmt.Sprintf("find / -name \"%s\"", name)
+	paths, sessionError := pssh.ExecuteCommand(c, findCommand)
+	if sessionError != nil {
+		return sessionError, nil
+	}
+	return nil, strings.Split(paths, "\n")
+}
+
 // runs in background-goroutine
 func (d *Device) doProvision(c *ssh.Client) {
 	logger := d.Log.WithField("component", "device_provision")
@@ -127,20 +138,16 @@ func (d *Device) doProvision(c *ssh.Client) {
 	}
 	logger.Debugf("local(%s) -> remote(%s) 100%%", tmpfile.Name(), remotePath)
 
-	var paths string
-	paths, sessionError = pssh.ExecuteCommand(c, "find / -name cfgmtd")
-	if sessionError != nil {
-		logger.Errorf("Could not find cfgmtd binary: %v, trying default path %s", sessionError, defaultConfigurationBin)
+	err, paths := getBinaryPaths(c, "cfgmtd")
+	if err != nil {
+		logger.Errorf("Could not find cfgmtd binary: %v, trying default path %s", err, defaultConfigurationBin)
 	}
-
-	if len(paths) < 6 {
-		paths = defaultConfigurationBin
-	} else {
-		logger.Debugf("Found cfgmtd paths: %s", paths)
+	if paths == nil || len(paths) == 0 {
+		paths = []string{defaultConfigurationBin}
 	}
 
 	configured := false
-	for _, binary := range strings.Split(paths, "\n") {
+	for _, binary := range paths {
 		command := fmt.Sprintf("%s -w -p /etc/", binary)
 		logger.Infof("Trying to save configuration with: %s", command)
 		_, sessionError = pssh.ExecuteCommand(c, command)
@@ -158,26 +165,39 @@ func (d *Device) doProvision(c *ssh.Client) {
 	}
 	logger.Info("Configuration saved")
 
-	_, sessionError = pssh.ExecuteCommand(c, "/usr/bin/reboot")
-	if sessionError != nil {
-		logger.Errorf("Reboot failed: %v", sessionError)
-		return
-	}
-	d.markReboot(5 * time.Second)
-	logger.Infof("Reboot succeeded")
+	_ = d.Reboot()
 }
 
 // Reboot issues a reboot on the device.
 func (d *Device) Reboot() error {
 	logger := d.Log.WithField("component", "device_reboot")
 	return d.withSSHClient("rebooting", func(c *ssh.Client) {
-		out, sessionError := pssh.ExecuteCommand(c, "/usr/bin/reboot")
-		if sessionError != nil {
-			logger.Errorf("Reboot failed: %v", sessionError)
-			return
+		err, paths := getBinaryPaths(c, "reboot")
+		if err != nil {
+			logger.Errorf("Could not find reboot binary: %v, trying default path %s", err, defaultRebootBin)
 		}
-		d.markReboot(5 * time.Second)
-		logger.Infof("Reboot succeeded: %s", out)
+		if paths == nil || len(paths) == 0 {
+			paths = []string{defaultRebootBin}
+		}
+
+		rebooted := false
+		for _, binary := range paths {
+			logger.Infof("Trying to reboot device with: %s", binary)
+			_, sessionError := pssh.ExecuteCommand(c, binary)
+			if sessionError != nil {
+				logger.Errorf("Reboot failed: %v", sessionError)
+				continue
+			}
+			rebooted = true
+			break
+		}
+		if rebooted {
+			d.markReboot(5 * time.Second)
+			logger.Info("Reboot succeeded")
+		} else {
+			logger.Error("Cannot reboot device, no working binary found")
+		}
+
 	})
 }
 
