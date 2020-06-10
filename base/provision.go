@@ -133,7 +133,7 @@ func (d *Device) doProvision(c *ssh.Client) {
 		logger.Errorf("Could not find cfgmtd binary: %v, trying default path %s", sessionError, defaultConfigurationBin)
 	}
 
-	if len(paths) == 0 {
+	if len(paths) < 6 {
 		paths = defaultConfigurationBin
 	} else {
 		logger.Debugf("Found cfgmtd paths: %s", paths)
