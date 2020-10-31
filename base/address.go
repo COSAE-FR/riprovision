@@ -1,8 +1,8 @@
 package base
 
 import (
-	"github.com/gcrahay/riprovision/address"
-	"github.com/gcrahay/riprovision/network"
+	"github.com/COSAE-FR/riprovision/address"
+	"github.com/COSAE-FR/riprovision/network"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"time"

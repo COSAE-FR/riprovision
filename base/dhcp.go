@@ -3,8 +3,8 @@ package base
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/gcrahay/riprovision/address"
-	"github.com/gcrahay/riprovision/network"
+	"github.com/COSAE-FR/riprovision/address"
+	"github.com/COSAE-FR/riprovision/network"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	log "github.com/sirupsen/logrus"

@@ -3,7 +3,7 @@ package base
 import (
 	"encoding/binary"
 	"fmt"
-	"github.com/gcrahay/riprovision/arp"
+	"github.com/COSAE-FR/riprovision/arp"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	log "github.com/sirupsen/logrus"

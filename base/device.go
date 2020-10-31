@@ -1,7 +1,7 @@
 package base
 
 import (
-	"github.com/gcrahay/riprovision/network"
+	"github.com/COSAE-FR/riprovision/network"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"

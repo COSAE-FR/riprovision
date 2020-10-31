@@ -3,8 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
-	"github.com/gcrahay/riprovision/address"
-	"github.com/gcrahay/riprovision/base"
+	"github.com/COSAE-FR/riprovision/address"
+	"github.com/COSAE-FR/riprovision/base"
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/hlandau/easyconfig.v1"

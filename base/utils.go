@@ -1,7 +1,7 @@
 package base
 
 import (
-	"github.com/gcrahay/riprovision/arp"
+	"github.com/COSAE-FR/riprovision/arp"
 	log "github.com/sirupsen/logrus"
 	"net"
 	"strings"

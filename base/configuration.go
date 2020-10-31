@@ -2,8 +2,8 @@ package base
 
 import (
 	"fmt"
-	"github.com/gcrahay/riprovision/address"
-	pssh "github.com/gcrahay/riprovision/ssh"
+	"github.com/COSAE-FR/riprovision/address"
+	pssh "github.com/COSAE-FR/riprovision/ssh"
 	lru "github.com/hashicorp/golang-lru"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	pssh "github.com/gcrahay/riprovision/ssh"
+	pssh "github.com/COSAE-FR/riprovision/ssh"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 	"io/ioutil"

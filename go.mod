@@ -1,4 +1,4 @@
-module github.com/gcrahay/riprovision
+module github.com/COSAE-FR/riprovision
 
 go 1.13
 
