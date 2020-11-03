@@ -43,6 +43,12 @@ func Table() ArpTable {
 
 		permanent := fields[f_Expiration] == "permanent"
 
+		// Prefer first permanent entries
+		previous, found := table[ip]
+		if found && previous.Permanent {
+			continue
+		}
+
 		table[ip] = ArpEntry{fields[f_HWAddr], ip, fields[f_Device], permanent}
 	}
 

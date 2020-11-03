@@ -35,6 +35,12 @@ func Table() ArpTable {
 		line := s.Text()
 		fields := strings.Fields(line)
 		permanent := fields[f_Flags] == "0x6"
+
+		// Prefer first permanent entries
+		previous, found := table[fields[f_IPAddr]]
+		if found && previous.Permanent {
+			continue
+		}
 		table[fields[f_IPAddr]] = ArpEntry{fields[f_HWAddr], fields[f_IPAddr], fields[f_Device], permanent}
 	}
 
