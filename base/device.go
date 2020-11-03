@@ -46,7 +46,7 @@ type Device struct {
 	Log        *log.Entry
 	busy       bool
 	busyMsg    string
-	busyMtx    sync.RWMutex
+	busyMtx    *sync.RWMutex
 }
 
 func (d *Device) String() string {
