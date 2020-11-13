@@ -18,6 +18,8 @@ const (
 	GlobalFilter = "ip and (udp dst port 67 or udp dst port 10001) and not vlan"
 )
 
+const Version = "0.9.0"
+
 type Config struct {
 	File string `usage:"Provision configuration file" default:"provision.yml"`
 }
@@ -31,13 +33,14 @@ func New(cfg Config) (*base.Server, error) {
 	}
 	log.SetLevel(logLevel)
 	configuration.Log = log.WithFields(log.Fields{
-		"app": "riprovision",
+		"app":     "riprovision",
+		"version": Version,
 	})
 	logger := configuration.Log.WithFields(log.Fields{
 		"component": "privileged_init",
 	})
 	if len(configuration.LogFile) > 0 {
-		f, err := os.OpenFile(configuration.LogFile, os.O_WRONLY | os.O_APPEND | os.O_CREATE, 0644)
+		f, err := os.OpenFile(configuration.LogFile, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0644)
 		if err == nil {
 			configuration.LogFileWriter = f
 			log.SetOutput(f)
@@ -121,7 +124,7 @@ func main() {
 	log.SetFormatter(&log.TextFormatter{
 		FullTimestamp:          true,
 		DisableLevelTruncation: true,
-		QuoteEmptyFields: true,
+		QuoteEmptyFields:       true,
 	})
 	log.SetOutput(os.Stderr)
 
@@ -130,7 +133,7 @@ func main() {
 		address.Setup()
 	} else {
 		logger := log.WithFields(log.Fields{
-			"app": "riprovision",
+			"app":       "riprovision",
 			"component": "main",
 		})
 		cfg := Config{}
