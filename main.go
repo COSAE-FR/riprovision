@@ -18,7 +18,7 @@ const (
 	GlobalFilter = "ip and (udp dst port 67 or udp dst port 10001) and not vlan"
 )
 
-const Version = "0.9.0"
+const Version = "0.10.0"
 
 type Config struct {
 	File string `usage:"Provision configuration file" default:"provision.yml"`
