@@ -12,48 +12,21 @@ func (server *Server) GetDHCPNetwork() (*net.IPNet, error) {
 	var networks []net.IPNet
 	for _, deviceMAC := range server.Cache.Keys() {
 		device, found := server.GetDevice(deviceMAC.(string))
-		if found && device.DHCP.ServerIP != nil {
+		if found && device.DHCP != nil && device.DHCP.ServerIP != nil && device.DHCP.NetworkMask != nil {
 			deviceNetwork := net.IPNet{
 				IP:   device.DHCP.ServerIP.Mask(*device.DHCP.NetworkMask),
 				Mask: *device.DHCP.NetworkMask,
 			}
+			if deviceNetwork.IP == nil {
+				server.Log.WithField("component", "network_finder").Warn("Cannot get server IP network")
+				continue
+			}
+			server.Log.WithField("component", "network_finder").Tracef("Found IP network: %s", deviceNetwork.String())
 			networks = append(networks, deviceNetwork)
 		}
 	}
 	server.Log.WithField("component", "network_finder").Debugf("Used networks computed (%d)", len(networks))
 	return network.GetFreeNetworkBlacklist(server.DHCP.baseNetwork, server.DHCP.NetworkPrefix, networks)
-}
-
-func LocalAddressManager(addressChan chan address.InterfaceAddress, exit chan int) {
-	log.Debugf("interface IP address manager started")
-	for {
-		select {
-		case <-exit:
-			log.Info("interface IP address manager exit requested")
-			return
-		case ipNetwork := <-addressChan:
-			log.Debugf("Handler address to add: %s", ipNetwork.Network.String())
-			_, targetNetwork, err := net.ParseCIDR(ipNetwork.Network.String())
-			if err != nil {
-				log.Errorf("Cannot get server IP: %+v", err)
-				continue
-			}
-			serverIP := network.NextIP(targetNetwork.IP, 1)
-			if ipNetwork.Remove {
-				err = address.RemoveInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
-				if err != nil {
-					log.Errorf("Cannot remove server IP: %v", err)
-				}
-				continue
-			} else {
-				err = address.AddInterfaceIP(serverIP, ipNetwork.Network.Mask, ipNetwork.Interface)
-				if err != nil {
-					log.Errorf("Cannot add server IP: %v", err)
-				}
-				continue
-			}
-		}
-	}
 }
 
 func (server *Server) LocalAddressCLeaner() {
@@ -66,7 +39,7 @@ func (server *Server) LocalAddressCLeaner() {
 		case <-server.StopClean:
 			logger.Info("Interface IP address cleaner exit requested")
 			return
-		case <- server.CleanTicker.C:
+		case <-server.CleanTicker.C:
 			now := time.Now()
 			logger.Debugf("Cleaner started at %s", now.String())
 			for _, deviceKeyInt := range server.Cache.Keys() {
@@ -88,7 +61,6 @@ func (server *Server) LocalAddressCLeaner() {
 		}
 	}
 }
-
 
 func (server *Server) RemoteAddressManager(address chan address.InterfaceAddress, exit chan int) {
 	logger := server.Log.WithField("component", "address_manager")

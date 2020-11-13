@@ -184,13 +184,15 @@ func (server *Server) AddDevice(device Device) bool {
 func (server *Server) GetDevice(mac string) (Device, bool) {
 	device, ok := server.Cache.Get(mac)
 	if ok {
-		deviceObject := device.(Device)
-		if deviceObject.Unifi != nil && deviceObject.Unifi.Provision != nil {
-			deviceObject.Unifi.Provision.Configuration = &server.Provision
+		deviceObject, castOk := device.(Device)
+		if castOk {
+			if deviceObject.Unifi != nil && deviceObject.Unifi.Provision != nil {
+				deviceObject.Unifi.Provision.Configuration = &server.Provision
+			}
+			return deviceObject, true
 		}
-		return deviceObject, ok
 	}
-	return Device{}, ok
+	return Device{}, false
 }
 
 func (server *Server) HasDevice(mac string) bool {
