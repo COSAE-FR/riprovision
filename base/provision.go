@@ -10,7 +10,6 @@ import (
 	"io/ioutil"
 	"os"
 	"reflect"
-	"strings"
 	"text/template"
 	"time"
 )
@@ -91,48 +90,10 @@ func (d *Device) Provision() error {
 	return d.withSSHClient("provisioning", d.doProvision)
 }
 
-func getBinaryPaths(c *ssh.Client, name string) (error, []string) {
-	var paths string
-	findCommand := fmt.Sprintf("find / -name \"%s\"", name)
-	paths, sessionError := pssh.ExecuteCommand(c, findCommand)
-	if sessionError != nil {
-		return sessionError, nil
-	}
-	return nil, strings.Split(paths, "\n")
-}
-
 func runCommand(c *ssh.Client, logger *logrus.Entry, name string, defaultName string, line string) error {
-	err, paths := getBinaryPaths(c, name)
+	_, err := pssh.FindAndExecuteCommand(c, name, line, defaultName)
 	if err != nil {
-		if len(defaultName) > 0 {
-			logger.Errorf("Could not find %s binary: %v, trying default path %s", name, err, defaultName)
-		} else {
-			return fmt.Errorf("cannot find binary %s", name)
-		}
-
-	}
-	if paths == nil || len(paths) == 0 {
-		paths = []string{defaultName}
-	}
-
-	configured := false
-	for _, binary := range paths {
-		command := binary
-		if len(line) > 0 {
-			command = fmt.Sprintf(line, binary)
-		}
-		logger.Infof("Trying to run: %s", command)
-		_, sessionError := pssh.ExecuteCommand(c, command)
-		if sessionError != nil {
-			logger.Errorf("Could not run %s: %v", command, sessionError)
-			continue
-		}
-		configured = true
-		break
-	}
-
-	if !configured {
-		return fmt.Errorf("no working %s binary", name)
+		return fmt.Errorf("no working %s binary: %s", name, err)
 	}
 	return nil
 }

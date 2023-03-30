@@ -136,6 +136,8 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 		"src_file":  localName,
 		"dest_file": remoteName,
 	})
+	binaries, _ := FindBinary(client, "scp")
+	binaries = append(binaries, "/usr/bin/scp", "/usr/sbin/scp")
 	return WithinSession(client, func(s *ssh.Session) error {
 		writer, err := s.StdinPipe()
 		if err != nil {
@@ -159,11 +161,18 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 		s.Stdout = &so
 		s.Stderr = &se
 
-		cmd := fmt.Sprintf("/usr/bin/scp -t %s", rdir) // danger!
-		logger.Debugf("Command: %s", cmd)
-
-		if err := s.Start(cmd); err != nil {
-			return err
+		var startError error
+		for _, binary := range binaries {
+			startError = nil
+			cmd := fmt.Sprintf("%s -t %s", binary, rdir) // danger!
+			logger.Debugf("Command: %s", cmd)
+			if startError = s.Start(cmd); startError != nil {
+				logger.Debugf("Cannot start scp: %s", startError)
+				continue
+			}
+		}
+		if startError != nil {
+			return startError
 		}
 
 		content := string(buf)
@@ -209,4 +218,51 @@ func ExecuteCommand(client *ssh.Client, cmd string) (string, error) {
 	})
 
 	return output, sessionErr
+}
+
+// FindBinary searches the SSH target for a suitable binary
+func FindBinary(client *ssh.Client, binary string) ([]string, error) {
+	logger := log.WithFields(log.Fields{
+		"app":       "riprovision",
+		"component": "ssh_find",
+		"binary":    binary,
+	})
+	var paths string
+	findCommand := fmt.Sprintf("find / -name \"%s\" -xdev -perm +700", binary)
+	paths, sessionError := ExecuteCommand(client, findCommand)
+	if sessionError != nil {
+		logger.Errorf("Cannot find binaries: %s", sessionError)
+		return nil, sessionError
+	}
+	return strings.Split(paths, "\n"), nil
+}
+
+// FindAndExecuteCommand finds a suitable binary on the SSH target and executes it
+func FindAndExecuteCommand(client *ssh.Client, binary string, cmd string, defaultsPaths ...string) (string, error) {
+	logger := log.WithFields(log.Fields{
+		"app":       "riprovision",
+		"component": "ssh_command_find",
+		"binary":    binary,
+		"command":   cmd,
+	})
+	binaries, findError := FindBinary(client, binary)
+	if findError != nil {
+		logger.Debugf("Cannot find binary, trying default path")
+	}
+	binaries = append(binaries, defaultsPaths...)
+	for _, exe := range binaries {
+		command := exe
+		if len(cmd) > 0 {
+			command = fmt.Sprintf(cmd, command)
+		}
+		logger.Debugf("Trying to run '%s'", command)
+		output, err := ExecuteCommand(client, command)
+		if err != nil {
+			logger.Errorf("Cannot run '%s': %s", command, err)
+			continue
+		}
+		return output, nil
+	}
+	logger.Debug("Cannot find suitable binary")
+	return "", fmt.Errorf("no suitable binary or command error")
 }
