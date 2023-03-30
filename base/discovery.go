@@ -329,7 +329,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 				}
 				unifiDevice := inform.Device()
 				logger = logger.WithFields(log.Fields{
-					"device_model": unifiDevice.Model,
+					"device_model":    unifiDevice.Model,
 					"device_platform": unifiDevice.Platform,
 				})
 				if unifiDevice.DeclaredMacAddress != mac {
@@ -338,17 +338,17 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 				}
 				device, found := server.GetDevice(mac)
 				deviceLogger := server.Log.WithFields(log.Fields{
-					"device": mac,
-					"device_model": unifiDevice.Model,
+					"device":          mac,
+					"device_model":    unifiDevice.Model,
 					"device_platform": unifiDevice.Platform,
 				})
-				if !found {
+				if !found || device == nil {
 					if server.DHCP.Enable {
 						logger.Error("Unknown device: cannot accept new devices when DHCP is enabled")
 						continue
 					}
 
-					device = Device{
+					device = &Device{
 						MacAddress: mac,
 						Unifi:      unifiDevice,
 						DHCP:       nil,
@@ -358,7 +358,7 @@ func (server *Server) HandleInform(in chan gopacket.Packet) {
 					device.Unifi = unifiDevice
 					device.Log = deviceLogger
 				}
-				provision := server.NewProvisionDevice(&device)
+				provision := server.NewProvisionDevice(device)
 				device.Unifi.Provision = provision
 				logger.Debug("Adding Device")
 				server.AddDevice(device)

@@ -17,7 +17,7 @@ type DHCPPacket struct {
 	Ethernet *layers.Ethernet
 	IP       *layers.IPv4
 	UDP      *layers.UDP
-	DHCP 	*layers.DHCPv4
+	DHCP     *layers.DHCPv4
 }
 
 func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
@@ -45,7 +45,7 @@ func preparePacket(packet gopacket.Packet) (*DHCPPacket, error) {
 	return pckt, nil
 }
 
-func (h *Server)DHCPServer() {
+func (h *Server) DHCPServer() {
 	logger := h.Log.WithFields(log.Fields{
 		"component": "DHCP",
 	})
@@ -91,9 +91,9 @@ func (h *Server)DHCPServer() {
 			reply := layers.DHCPMsgTypeUnspecified
 			switch msgType {
 			case layers.DHCPMsgTypeDiscover:
-				if !found {
+				if !found || device == nil {
 					deviceLogger := log.WithField("device", mac)
-					device = Device{
+					device = &Device{
 						MacAddress: mac,
 						Unifi:      nil,
 						DHCP:       nil,
@@ -130,7 +130,7 @@ func (h *Server)DHCPServer() {
 				reply = layers.DHCPMsgTypeOffer
 				break
 			case layers.DHCPMsgTypeRequest:
-				if !found {
+				if !found || device == nil {
 					logger.Error("DHCP Request message from unknown device")
 					continue
 				}
@@ -163,7 +163,7 @@ func (h *Server)DHCPServer() {
 				continue
 			}
 			if reply != layers.DHCPMsgTypeUnspecified {
-				dhcpReply := createDHCPReply(dhcpPacket.DHCP, reply, &device, h.DHCP.LeaseDuration)
+				dhcpReply := createDHCPReply(dhcpPacket.DHCP, reply, device, h.DHCP.LeaseDuration)
 				var ip *layers.IPv4
 				if dhcpPacket.IP.SrcIP.Equal(net.IPv4zero) || dhcpPacket.IP.DstIP.Equal(net.IPv4bcast) {
 					ip = &layers.IPv4{
@@ -224,7 +224,7 @@ func createDHCPOptions(msgType layers.DHCPMsgType, device *Device, duration time
 	if duration > 0 {
 		leaseBytes := make([]byte, 4)
 		binary.BigEndian.PutUint32(leaseBytes, uint32(duration/time.Second))
-		options = append(options, layers.NewDHCPOption(layers.DHCPOptLeaseTime,leaseBytes))
+		options = append(options, layers.NewDHCPOption(layers.DHCPOptLeaseTime, leaseBytes))
 	}
 	options = append(options, layers.NewDHCPOption(layers.DHCPOptSubnetMask, *device.DHCP.NetworkMask))
 	options = append(options, layers.NewDHCPOption(layers.DHCPOptRouter, device.DHCP.ServerIP.To4()))
@@ -241,7 +241,7 @@ func getDHCPMsgType(dhcp *layers.DHCPv4) layers.DHCPMsgType {
 		return layers.DHCPMsgTypeUnspecified
 	}
 	msgType := layers.DHCPMsgType(option.Data[0])
-	if msgType < layers.DHCPMsgTypeDiscover ||  msgType > layers.DHCPMsgTypeInform {
+	if msgType < layers.DHCPMsgTypeDiscover || msgType > layers.DHCPMsgTypeInform {
 		return layers.DHCPMsgTypeUnspecified
 	}
 	return msgType
@@ -276,4 +276,3 @@ func createDHCPReply(request *layers.DHCPv4, msgType layers.DHCPMsgType, device 
 		Options:      options,
 	}
 }
-

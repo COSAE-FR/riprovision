@@ -95,8 +95,8 @@ func New(cfg Config) (*base.Server, error) {
 
 		configuration.Cache, err = lru.NewWithEvict(configuration.MaxDevices, func(key interface{}, value interface{}) {
 			if value != nil {
-				device := value.(base.Device)
-				if device.DHCP != nil && device.DHCP.ServerIP != nil {
+				device := value.(*base.Device)
+				if device != nil && device.DHCP != nil && device.DHCP.ServerIP != nil {
 					configuration.ManageNet <- address.InterfaceAddress{
 						Network:   net.IPNet{IP: *device.DHCP.ServerIP, Mask: *device.DHCP.NetworkMask},
 						Interface: configuration.Interface,

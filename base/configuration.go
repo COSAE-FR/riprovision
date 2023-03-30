@@ -150,7 +150,7 @@ func (server *Server) Stop() error {
 	if server.DHCP.Enable {
 		for _, deviceKeyInt := range server.Cache.Keys() {
 			device, found := server.GetDevice(deviceKeyInt.(string))
-			if found {
+			if found && device != nil {
 				if device.DHCP != nil && device.DHCP.ServerIP != nil {
 					server.ManageNet <- address.InterfaceAddress{
 						Network: net.IPNet{
@@ -173,7 +173,7 @@ func (server *Server) Stop() error {
 	return nil
 }
 
-func (server *Server) AddDevice(device Device) bool {
+func (server *Server) AddDevice(device *Device) bool {
 	if device.Unifi != nil && device.Unifi.Provision != nil {
 		device.Unifi.Provision.Configuration = &server.Provision
 	}
@@ -181,18 +181,18 @@ func (server *Server) AddDevice(device Device) bool {
 
 }
 
-func (server *Server) GetDevice(mac string) (Device, bool) {
+func (server *Server) GetDevice(mac string) (*Device, bool) {
 	device, ok := server.Cache.Get(mac)
 	if ok {
-		deviceObject, castOk := device.(Device)
-		if castOk {
+		deviceObject, castOk := device.(*Device)
+		if castOk && deviceObject != nil {
 			if deviceObject.Unifi != nil && deviceObject.Unifi.Provision != nil {
 				deviceObject.Unifi.Provision.Configuration = &server.Provision
 			}
 			return deviceObject, true
 		}
 	}
-	return Device{}, false
+	return nil, false
 }
 
 func (server *Server) HasDevice(mac string) bool {

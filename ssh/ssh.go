@@ -170,6 +170,7 @@ func UploadFile(client *ssh.Client, localName string, remoteName string) error {
 				logger.Debugf("Cannot start scp: %s", startError)
 				continue
 			}
+			break
 		}
 		if startError != nil {
 			return startError
@@ -234,7 +235,13 @@ func FindBinary(client *ssh.Client, binary string) ([]string, error) {
 		logger.Errorf("Cannot find binaries: %s", sessionError)
 		return nil, sessionError
 	}
-	return strings.Split(paths, "\n"), nil
+	binaries := make([]string, 0)
+	for _, b := range strings.Split(paths, "\n") {
+		if len(b) > 0 {
+			binaries = append(binaries, b)
+		}
+	}
+	return binaries, nil
 }
 
 // FindAndExecuteCommand finds a suitable binary on the SSH target and executes it
